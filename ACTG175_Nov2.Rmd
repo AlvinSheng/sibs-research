@@ -1,0 +1,487 @@
+---
+title: "ACTG175_Nov2"
+date: "October 31, 2018"
+output: pdf_document
+---
+
+# Set Up
+
+Requisite Libraries
+<!-- Automatically detect and download libraries -->
+```{r}
+library(survival)
+library(glmnet)
+library(polspline)
+library(knitr)
+library(EnvStats)
+```
+
+```{r, include = FALSE}
+### read in data and combine
+all <- read.table("all.dat", header=F, sep="", col.names=c("pidnum","age","wtkg","hemo","homo","drugs","karnof","oprior","z30","zprior","preanti","race","gender","str2","strat","symptom","treat","offtrt","cd40","cd420","cd496","r","cd80","cd820"))
+
+events <- read.table("events.dat", header=F, sep="", 
+                     col.names=c("pidnum","censor","Tdays","trt"))
+
+Tyears <- events$Tdays/365
+cen <- events$censor
+data <- data.frame(pidnum = events$pidnum, time = Tyears, cid = cen, trt = events$trt)
+
+data0 <- merge(data, all, by="pidnum", all=T)
+
+### Removing incomplete data
+keep <- !is.na(rowSums(data0))
+data1 <- data0[keep,]
+
+### I added these lines (9/16) in order to use cor() below
+index <- order(data1$time, decreasing=F)  
+actg175_num <- data1[index,]
+
+### Set the approporiate class for each variable
+for (i in setdiff(names(data1), c("age","wtkg","karnof","preanti","cd40","cd420","cd496","cd80", "cd820", "cid","time","trt")))
+  data1[[i]] <- as.factor(data1[[i]])
+
+data1$trt <- as.factor(data1$trt); levels(data1$trt)=c("ZDV","ZDV+ddi","ZDV+ZAL","ddi")
+
+### re-order the data by increasing time
+index <- order(data1$time, decreasing=F)  
+actg175 <- data1[index,]
+
+### save the raw data
+save(actg175, file="actg175.RData")
+```
+
+## Constructing the Design Matrix
+
+**I have omitted variables cd420 and cd820, on the basis of the SUGI paper's recommendations**
+
+The groups of people off-treatment by ~96 weeks and people not off-treatment by ~96 weeks are large enough for subgroup analysis.
+
+```{r}
+actg175_mat <- model.matrix( ~ trt + age + wtkg + hemo + drugs +
+                               karnof + oprior + preanti + race +
+                               gender + symptom + offtrt + cd40 +
+                               cd80, actg175)[,-1]
+
+# Stratifying the data on offtrt for Subgroup Analysis
+mat_not_off <- model.matrix( ~ trt + age + wtkg + hemo + drugs +
+                               karnof + oprior + preanti + race +
+                               gender + symptom + cd40 + cd80, 
+                               actg175[actg175$offtrt == 0,])[,-1]
+
+mat_off <- model.matrix( ~ trt + age + wtkg + hemo + drugs +
+                               karnof + oprior + preanti + race +
+                               gender + symptom + cd40 + cd80, 
+                               actg175[actg175$offtrt == 1,])[,-1]
+
+```
+
+```{r, warning = FALSE}
+covariate_names <- colnames(actg175_mat)
+
+kable(covariate_names, row.names = 1:length(covariate_names), col.names = "Covariates", 
+      caption = "These are the covariates of the data,
+      in order, that will be used in glmnet and HARE")
+```
+
+```{r, warning = FALSE}
+covariate_names <- colnames(mat_not_off)
+
+kable(covariate_names, row.names = 1:length(covariate_names), col.names = "Covariates", 
+      caption = "These are the covariates of the data stratified by offtrt, in order, that will be used in glmnet and HARE")
+```
+
+# Survival Analysis
+
+## Proportional Hazards Modelling
+
+### Cox Proportional Hazards Model, unstratified dataset
+
+```{r}
+(phm_full <- coxph(Surv(time, cid) ~ trt + age + wtkg + hemo + drugs +
+                               karnof + oprior + preanti + race +
+                               gender + symptom + offtrt + cd40 +
+                               cd80, data = actg175))
+
+```
+
+```{r}
+print(cox.zph(phm_full))
+```
+
+### Cox Proportional Hazards Models, Stratified on Offtrt
+
+Not off-treatment group
+```{r}
+phm_not_off <- coxph(Surv(time, cid) ~ trt + age + wtkg + hemo + drugs +
+                               karnof + oprior + preanti + race +
+                               gender + symptom + cd40 + cd80, 
+                     data = actg175[actg175$offtrt == 0,])
+phm_not_off
+```
+
+```{r}
+cox.zph(phm_not_off)
+```
+
+Off-treatment group
+```{r}
+phm_off <- coxph(Surv(time, cid) ~ trt + age + wtkg + hemo + drugs +
+                               karnof + oprior + preanti + race +
+                               gender + symptom + cd40 + cd80, 
+                     data = actg175[actg175$offtrt == 1,])
+phm_off
+```
+
+```{r}
+cox.zph(phm_off)
+```
+
+### Survival Curves using Bernstein Polynomials, Overlaid on the Kaplan-Meier Curves
+
+#### Survival Curves for cd820
+
+```{r}
+source("BPSurv.R")
+pwr=0.4 #see Osman&Ghosh (2012) for details
+yrs=seq(0,max(actg175$time),l=100)
+
+above_med <- ifelse(actg175$cd820 > median(actg175$cd820), 1, 0)
+
+pred=as.factor(above_med)
+pred.levels=levels(pred); n.levels=length(pred.levels)
+km.fit=survfit(Surv(time, cid) ~ pred, data=actg175)
+lb=min(km.fit$lower)
+plot(km.fit,col=1:n.levels,lty=2,ylab="survival function",xlab="years",ylim=c(lb,1))
+for(j in 1:n.levels){
+surv.time=actg175$time[pred==pred.levels[j]]; status=actg175$cid[pred==pred.levels[j]]
+n=length(surv.time); m.est=ceiling(n^pwr)
+bp.fit=BPsurv(y=surv.time,d=status,m=m.est)
+S.bp=bp.fit$SFun(yrs)
+lines(yrs, S.bp, col=j)
+#log.haz=bp.fit$hFun(yrs)
+#lines(yrs,log.haz)
+             }
+# legend("bottomleft",legend=c("Below Median cd820", "Above Median cd820"),col=1:n.levels,lty=1)
+title("Example of non-proportional hazards",cex=0.75)
+```
+
+Same thing without the Bernstein curves
+```{r}
+above_med <- ifelse(actg175$cd820 > median(actg175$cd820), 1, 0)
+
+pred=as.factor(above_med)
+pred.levels=levels(pred); n.levels=length(pred.levels)
+km.fit=survfit(Surv(time, cid) ~ pred, data=actg175)
+lb=min(km.fit$lower)
+plot(km.fit,col=1:n.levels,ylab="survival function",xlab="years",ylim=c(lb,1))
+
+# legend("bottomleft",legend=c("Below Median cd820", "Above Median cd820"),col=1:n.levels,lty=1)
+# title("Example of non-proportional hazards",cex=0.75)
+```
+
+#### Survival Curves for Treatment
+
+```{r}
+# above_med <- ifelse(actg175$cd820 > median(actg175$cd820), 1, 0)
+
+pred=actg175$trt
+pred.levels=levels(pred); n.levels=length(pred.levels)
+km.fit=survfit(Surv(time, cid) ~ pred, data=actg175)
+lb=min(km.fit$lower)
+plot(km.fit,col=1:n.levels,ylab="Survival",xlab="Years",ylim=c(lb,1), lwd = 2, cex.lab = 1.5)
+
+legend("bottomleft",legend = paste("Trt:", pred.levels),col=1:n.levels,lty=1, lwd = 2)
+# title("Kaplan-Meier Curves of the Treatments",cex=0.75)
+```
+
+#### Survival Curves for Offtrt
+
+```{r}
+# above_med <- ifelse(actg175$cd820 > median(actg175$cd820), 1, 0)
+
+pred=actg175$offtrt
+pred.levels=levels(pred); n.levels=length(pred.levels)
+km.fit=survfit(Surv(time, cid) ~ pred, data=actg175)
+lb=min(km.fit$lower)
+plot(km.fit,col=1:n.levels,ylab="Survival",xlab="Years",ylim=c(lb,1), lwd = 2, cex.lab = 1.5)
+
+legend("bottomleft",legend = c("Not Off-Trt", "Off-Trt"),col=1:n.levels,lty=1, lwd = 2)
+# title("Example of non-proportional hazards",cex=0.75)
+```
+
+
+
+## Lasso and Elastic-Net Regularized Generalized Linear Models
+
+I'm using an alpha value of .95.
+
+Finding the optimal lambda by running cross-validation 100 times and finding the median lambda.min
+
+### Unstratified Dataset
+
+```{r}
+set.seed(123)
+
+lambdas <- rep(0, 100)
+
+for (i in 1:100) {
+cv <- cv.glmnet(actg175_mat, Surv(actg175$time,
+                                  actg175$cid), 
+                family = "cox", alpha = .95)
+lambdas[i] <- cv$lambda.1se
+}
+
+median(lambdas)
+```
+
+Using the median lambda to find the chosen coefficients
+
+```{r}
+cv_phmnet <- cv.glmnet(actg175_mat,
+                       Surv(actg175$time, actg175$cid),
+                           family = "cox", alpha = .95)
+
+med_lambda <- median(lambdas)
+
+coef(cv_phmnet, s = med_lambda)
+```
+
+<!-- compare with HARE model below -->
+
+### Dataset Stratified on Offtrt
+
+Not off-treatment group
+```{r}
+set.seed(1019)
+
+lambdas_not_off <- rep(0, 100)
+
+for (i in 1:100) {
+cv <- cv.glmnet(mat_not_off, Surv(actg175$time[actg175$offtrt == 0],
+                                  actg175$cid[actg175$offtrt == 0]), 
+                family = "cox", alpha = .95)
+lambdas_not_off[i] <- cv$lambda.1se
+}
+
+median(lambdas_not_off)
+```
+
+Not off-treatment group
+```{r}
+cv_phmnet_not_off <- cv.glmnet(mat_not_off,
+                               Surv(actg175$time[actg175$offtrt == 0],
+                                    actg175$cid[actg175$offtrt == 0]),
+                               family = "cox", alpha = .95)
+
+med_lambda_not_off <- median(lambdas_not_off)
+
+coef(cv_phmnet_not_off, s = med_lambda_not_off)
+```
+
+Exact same results as in Oct 19 report. Apparently, removing cd820 from mat_off had no effect.
+
+Off-treatment group
+```{r}
+set.seed(1102)
+
+lambdas_off <- rep(0, 100)
+
+for (i in 1:100) {
+cv <- cv.glmnet(mat_off, Surv(actg175$time[actg175$offtrt == 1],
+                              actg175$cid[actg175$offtrt == 1]),
+                family = "cox", alpha = .95)
+lambdas_off[i] <- cv$lambda.1se
+}
+
+median(lambdas_off)
+```
+
+Off-treatment group
+```{r}
+cv_phmnet_off <- cv.glmnet(mat_off, Surv(actg175$time[actg175$offtrt == 1],
+                                         actg175$cid[actg175$offtrt == 1]),
+                           family = "cox", alpha = .95)
+
+med_lambda_off <- median(lambdas_off)
+
+
+coef(cv_phmnet_off, s = med_lambda_off)
+```
+
+As compared with the Oct 19 report, this model is missing drugs and karnof.
+
+### HARE restricted to proportional hazards models, unstratified dataset
+
+Restricting model selection to **proportional hazards models** through prophaz = TRUE
+```{r}
+phm_hare <- hare(actg175$time, actg175$cid, actg175_mat, prophaz = TRUE)
+
+summary(phm_hare)
+```
+
+As compared with the corresponding HARE model with just cd420 deleted instead of both cd420 and cd820, the variables chosen are the same in this model (without cd820, of course), supporting the decision to omit cd820.
+
+### HARE restricted to proportional hazards models, stratified on Offtrt
+
+Not Off-treatment group
+```{r}
+phm_hare_not_off <- hare(actg175$time[actg175$offtrt == 0],
+                                  actg175$cid[actg175$offtrt == 0], mat_not_off, prophaz = TRUE)
+
+summary(phm_hare_not_off)
+```
+
+Off-treatment group
+```{r}
+phm_hare_off <- hare(actg175$time[actg175$offtrt == 1],
+                                  actg175$cid[actg175$offtrt == 1], mat_off, prophaz = TRUE)
+
+summary(phm_hare_off)
+```
+
+
+
+## Non-Proportional Hazards Modelling
+
+### Default HARE, unstratified dataset
+
+HARE, with default settings. Please refer to Table 1 to interpret the basis functions in the HARE model. 
+```{r}
+nphm_hare <- hare(actg175$time, actg175$cid, actg175_mat)
+
+summary(nphm_hare)
+```
+
+As compared with the corresponding HARE model with just cd420 deleted instead of both cd420 and cd820, the variables chosen are the same in this model (without cd820, of course), supporting the omission of cd820.
+
+Compare with corresponding glmnet model 
+
+
+
+### Default HARE, stratified on Offtrt
+
+HARE, with default settings. Please refer to Table 2 to interpret the basis functions in the HARE model. 
+
+Not Off-treatment group
+```{r}
+nphm_hare_not_off <- hare(actg175$time[actg175$offtrt == 0],
+                          actg175$cid[actg175$offtrt == 0],
+                          mat_not_off)
+
+summary(nphm_hare_not_off)
+```
+
+No time interactions in the above model. It looks like offtrt bears the brunt of the time interaction.
+
+
+Off-treatment Group
+```{r}
+nphm_hare_off <- hare(actg175$time[actg175$offtrt == 1],
+                          actg175$cid[actg175$offtrt == 1],
+                          mat_off)
+
+summary(nphm_hare_off)
+```
+
+The above model has exactly the same results as its proportional hazards version. It's not the case for the not off-treatment group, however
+
+
+
+### HARE Survival Curves
+
+**Note**: If we omit cd420, I think the plot that best represents non-proportional hazards is the plot below "Choosing patients based on offtrt". Based on the HARE summary, the only time interaction present was that for offtrt
+
+Note: when choosing patients, if there are multiple patients that fit the desired characteristics, I choose the patient arbitrarily.
+
+#### Choosing patients based on offtrt
+
+Note: indexing by row number instead of row name
+
+```{r}
+# Patient who did not go off treatment
+
+# The below code chooses the patient with the desired characteristic with the MEDIAN time-to-event
+ind <- which(actg175_mat[,14] == 0)
+if (length(ind) %% 2 != 0) {
+  mid <- ind[length(ind)/2 + .5]
+} else {
+  mid <- ind[length(ind)/2] # arbitrarily choose lesser one
+}
+# top number, 1228, is the row name (row number of original matrix). Bottom number, 1380, is the actual row number.
+mid
+actg175_mat[mid,]
+
+cat("\n")
+
+# Patient who did go off treatment
+
+ind <- which(actg175_mat[,14] == 1)
+if (length(ind) %% 2 != 0) {
+  mid <- ind[length(ind)/2 + .5]
+} else {
+  mid <- ind[length(ind)/2] # arbitrarily choose lesser one
+}
+mid
+actg175_mat[mid,]
+
+cat("\n")
+
+```
+
+```{r}
+plot(nphm_hare, actg175_mat[1380,], what = "s", col = 1, ylim = c(.70,1))
+
+plot(nphm_hare, actg175_mat[575,], what = "s", col = 2, add = TRUE)
+
+
+
+# patient with same offtrt value as row number 1380 but with other covariates being row 575's
+x1 <- actg175_mat[575,]
+x1[14] <- 0
+plot(nphm_hare, x1, what = "s", col = 1, lty = 2, add = TRUE)
+
+# patient with same offtrt value as row number 575 but with other covariates being row 1380's
+x2 <- actg175_mat[1380,]
+x2[14] <- 1
+plot(nphm_hare, x2, what = "s", col = 2, lty = 2, add = TRUE)
+
+legend("bottomleft",legend=c("1380th Patient, Offtrt = 0", "575th Patient, Offtrt = 1", "Modified 575th Patient, Offtrt = 0", "Modified 1380th Patient, Offtrt = 1"),col=c(1, 2, 1, 2), lty = c(1, 1, 2, 2), cex = .7)
+```
+
+Caption for the above graph: The black and red solid lines refer to the survival curves conditioned on the covariates for the 1380th and 575th patients in the ACTG-175 data set, respectively. Each dashed line has the same Offtrt value as the solid line of the same color, but all other covariates take on the values of the other patient. 
+
+Note that when the solid red line is compared with the dashed black line, where only the Offtrt value is different between them, the hazards seem to cross. 
+
+Showcases quite a bit of interaction
+
+<!-- consult Jiang et al. for how to write the above up formally -->
+
+```{r}
+plot(nphm_hare, actg175_mat[1380,], what = "s", col = 1, ylim = c(.70,1), ylab = "Survival", xlab = "Years", xaxt="n", lwd = 2, cex.lab = 1.5)
+
+plot(nphm_hare, actg175_mat[575,], what = "s", col = 2, add = TRUE, lwd = 2)
+
+# patient with same offtrt value as row number 1380 but with other covariates being row 575's
+x1 <- actg175_mat[575,]
+x1[14] <- 0
+plot(nphm_hare, x1, what = "s", col = 1, lty = 2, add = TRUE, lwd = 2)
+
+# patient with same offtrt value as row number 575 but with other covariates being row 1380's
+x2 <- actg175_mat[1380,]
+x2[14] <- 1
+plot(nphm_hare, x2, what = "s", col = 2, lty = 2, add = TRUE, lwd = 2)
+
+axis(1, at = seq(0, 3.5, by = .5))
+
+abline(v = .61, lwd = 2)
+
+abline(v = 1.3, lwd = 2)
+
+# legend("bottomleft",legend=c("1380th Patient, Offtrt = 0", "575th Patient, Offtrt = 1", "Modified 575th Patient, Offtrt = 0", "Modified 1380th Patient, Offtrt = 1"),col=c(1, 2, 1, 2), lty = c(1, 1, 2, 2), cex = .7)
+
+legend("bottomleft",legend = c("1380th Patient, Offtrt = 0", "575th Patient, Offtrt = 1", "Modified 575th Patient, Offtrt = 0", "Modified 1380th Patient, Offtrt = 1"),col=c(1, 2, 1, 2), lty = c(1, 1, 2, 2), lwd = 2)
+```
+
+The vertical lines indicate the knots of time when interacting with offtrt. See the nphm_hare output above.
+
