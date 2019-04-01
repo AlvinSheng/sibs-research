@@ -357,6 +357,12 @@ As compared with the corresponding HARE model with just cd420 deleted instead of
 
 Compare with corresponding glmnet model 
 
+Save the model for the simulation study
+```{r}
+saveRDS(nphm_hare, "nphm_hare.rds")
+```
+
+
 
 
 ### Default HARE, stratified on Offtrt
@@ -484,4 +490,12 @@ legend("bottomleft",legend = c("1380th Patient, Offtrt = 0", "575th Patient, Off
 ```
 
 The vertical lines indicate the knots of time when interacting with offtrt. See the nphm_hare output above.
+
+
+
+# Simulation Study
+
+```{r}
+
+```
 
