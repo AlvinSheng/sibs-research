@@ -1,0 +1,50 @@
+---
+title: "Simulation Study"
+author: "Alvin Sheng"
+date: "4/6/2019"
+output: pdf_document
+---
+
+<!-- source load_dependencies later -->
+```{r}
+
+```
+
+# Simulating Survival Time with a Weibull Distribution
+
+This function is based on simulate_data in https://cran.r-project.org/web/packages/rsimsum/vignettes/relhaz.html
+
+```{r}
+#' Simulate survival times with censoring, based on a weibull baseline hazard
+#'
+#' This function simulates survival times with censoring, according to a weibull
+#' baseline hazard that the user parameterizes. The survival/censoring times are 
+#' simulated for user-given covariates and coefficients.
+#' @param n how many survival/censoring time values to simulate
+#' @param params parameters shape and scale for the baseline Weibull distribution, by default the exponential distribution with scale = 1
+#' @param x x-values for the Cox model of survival times
+#' @param betas coefficients for the Cox model of survival times
+#' @return A vector of column names matching the keyword
+#' @export
+simulate_weibull <- function(n, params = list(shape = 1, scale = 1), x, betas) {
+  
+  # do dot product between x and the betas
+  
+}
+```
+
+<!-- Test rexp vs uniform transform -->
+
+```{r}
+nphm_hare <- readRDS("nphm_hare.rds")
+
+# extracting the coefficients for basis functions 
+# that do not correspond to knots and/or tensor products
+betas <- nphm_hare$fcts[sdjflsjldkfjklsdlkf]
+
+# extract unique list of coefficients selected 
+
+```
+
+
+
