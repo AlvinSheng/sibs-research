@@ -493,9 +493,8 @@ The vertical lines indicate the knots of time when interacting with offtrt. See 
 
 
 
-# Simulation Study
 
-```{r}
 
-```
+
+
 
