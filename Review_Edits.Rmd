@@ -6,6 +6,8 @@ output: pdf_document
 ---
 
 <!-- source load_dependencies later -->
+<!-- Automatically detect and download libraries -->
+<!-- download conflicted package -->
 ```{r}
 
 ```
@@ -20,31 +22,62 @@ This function is based on simulate_data in https://cran.r-project.org/web/packag
 #' This function simulates survival times with censoring, according to a weibull
 #' baseline hazard that the user parameterizes. The survival/censoring times are 
 #' simulated for user-given covariates and coefficients.
-#' @param n how many survival/censoring time values to simulate
-#' @param params parameters shape and scale for the baseline Weibull distribution, by default the exponential distribution with scale = 1
-#' @param x x-values for the Cox model of survival times
-#' @param betas coefficients for the Cox model of survival times
-#' @return A vector of column names matching the keyword
+#' @param x model matrix (including intercept) of x-values for the Cox model of survival times
+#' @param fcts_select subset of fcts from a hare object containing the coefficients of interest. 
+#' @param params parameters shape and rate for the baseline Weibull distribution, by default the exponential distribution with rate = 1
+#' @param FUN random generation function for the distribution of censoring times, expected to be uniform, exponential, or weibull. 
+#' @param ... arguments for FUN, the random generation function
+#' @return 
 #' @export
-simulate_weibull <- function(n, params = list(shape = 1, scale = 1), x, betas) {
+simulate_weibull <- function(x, fcts_select, params = list(shape = 1, rate = 1), FUN, ...) {
   
-  # do dot product between x and the betas
+  n <- nrow(x)
   
+  # extract unique list of covariates selected 
+  cov_nums <- sort(fcts_select[,1][fcts_select[,1] != 0])
+  cov_names <- colnames(x)[cov_nums]
+  x_select <- x[,cov_names]
+  
+  # extract the coefficient values from fcts_select
+  betas <- fcts_select[,5][fcts_select[,1] != 0]
+  
+  # simulate survival times according to Bender et al. (2005)
+  u <- runif(n)
+  time <- (-log(u) / (params$rate * exp(x_select %*% betas)))^(1 / params$shape)
+  
+  # Censoring
+  # **
+  cid = 1
+  
+  # return a dataframe
+  data.frame(time, cid, x)
 }
 ```
 
 <!-- Test rexp vs uniform transform -->
 
 ```{r}
+load("actg175.RData")
+
+x <- model.matrix( ~ trt + age + wtkg + hemo + drugs +
+                               karnof + oprior + preanti + race +
+                               gender + symptom + offtrt + cd40 +
+                               cd80, actg175)
+
+# x <- readRDS("actg175_mat.rds")
+
 nphm_hare <- readRDS("nphm_hare.rds")
 
 # extracting the coefficients for basis functions 
 # that do not correspond to knots and/or tensor products
-betas <- nphm_hare$fcts[sdjflsjldkfjklsdlkf]
-
-# extract unique list of coefficients selected 
-
+fcts <- nphm_hare$fcts
+fcts_select <- fcts[fcts[,2] == 0 & is.na(fcts[,3]),]
 ```
 
+```{r}
+set.seed(513)
+
+test1 <- simulate_weibull(x, fcts_select)
+```
 
 
