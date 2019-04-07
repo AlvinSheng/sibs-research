@@ -88,4 +88,15 @@ summary(test1$time)
 head(test1)
 ```
 
+```{r}
+set.seed(513)
+
+test2 <- simulate_weibull(x, fcts_select, params = list(shape = 10, scale = 1))
+
+summary(test2$time)
+
+head(test2)
+```
+
+
 
