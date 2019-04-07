@@ -9,7 +9,11 @@ output: pdf_document
 <!-- Automatically detect and download libraries -->
 <!-- download conflicted package -->
 ```{r}
-
+library(survival)
+library(glmnet)
+library(polspline)
+library(knitr)
+library(EnvStats)
 ```
 
 # Simulating Survival Time with a Weibull Distribution
@@ -78,6 +82,8 @@ fcts_select <- fcts[fcts[,2] == 0 & is.na(fcts[,3]),]
 set.seed(513)
 
 test1 <- simulate_weibull(x, fcts_select)
+
+summary(test1$time)
 ```
 
 
