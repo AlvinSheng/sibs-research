@@ -28,12 +28,12 @@ This function is based on simulate_data in https://cran.r-project.org/web/packag
 #' simulated for user-given covariates and coefficients.
 #' @param x model matrix (including intercept) of x-values for the Cox model of survival times
 #' @param fcts_select subset of fcts from a hare object containing the coefficients of interest. 
-#' @param params parameters shape and rate for the baseline Weibull distribution, by default the exponential distribution with rate = 1
+#' @param params parameters shape and scale for the baseline Weibull distribution, by default the exponential distribution with scale = 1
 #' @param FUN random generation function for the distribution of censoring times, expected to be uniform, exponential, or weibull. 
 #' @param ... arguments for FUN, the random generation function
 #' @return 
 #' @export
-simulate_weibull <- function(x, fcts_select, params = list(shape = 1, rate = 1), FUN, ...) {
+simulate_weibull <- function(x, fcts_select, params = list(shape = 1, scale = 1), FUN, ...) {
   
   n <- nrow(x)
   
@@ -47,7 +47,7 @@ simulate_weibull <- function(x, fcts_select, params = list(shape = 1, rate = 1),
   
   # simulate survival times according to Bender et al. (2005)
   u <- runif(n)
-  time <- (-log(u) / (params$rate * exp(x_select %*% betas)))^(1 / params$shape)
+  time <- (-log(u) / (params$scale * exp(x_select %*% betas)))^(1 / params$shape)
   
   # Censoring
   # **
