@@ -84,6 +84,8 @@ set.seed(513)
 test1 <- simulate_weibull(x, fcts_select)
 
 summary(test1$time)
+
+head(test1)
 ```
 
 
