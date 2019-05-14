@@ -12,49 +12,50 @@ library(glmnet)
 library(polspline)
 library(knitr)
 library(EnvStats)
+library(bda)
 ```
 
 # Simulating Survival Time with a Weibull Distribution
 
 This function is based on simulate_data in https://cran.r-project.org/web/packages/rsimsum/vignettes/relhaz.html
 
-```{r}
-#' Parameter Estimation for Weibull Distribution
-#'
-#' This function solves an optimization problem to determine the lambda and nu parameters of the
-#' Weibull distribution
-#' @param intercept the intercept of the hare model
-#' @param FUN the linear combination of basis functions of the hare model involving time
-#' @return parameters of the Weibull distribution that best fits the baseline hazard of the hare model
-#' @export
-estimate_weibull <- function(intercept, FUN) {
+<!-- ```{r} -->
+<!-- #' Parameter Estimation for Weibull Distribution -->
+<!-- #' -->
+<!-- #' This function solves an optimization problem to determine the lambda and nu parameters of the -->
+<!-- #' Weibull distribution -->
+<!-- #' @param intercept the intercept of the hare model -->
+<!-- #' @param FUN the linear combination of basis functions of the hare model involving time -->
+<!-- #' @return parameters of the Weibull distribution that best fits the baseline hazard of the hare model -->
+<!-- #' @export -->
+<!-- estimate_weibull <- function(intercept, FUN) { -->
 
-  # Estimating lambda
-  lambda <- exp(intercept)
+<!--   # Estimating lambda -->
+<!--   lambda <- exp(intercept) -->
 
-  # Estimating nu
-  time <- seq(0.01, 3.5, length.out = 1000)
+<!--   # Estimating nu -->
+<!--   time <- seq(0.01, 3.5, length.out = 1000) -->
 
-  fun_diff <- function(v, time) {
+<!--   fun_diff <- function(v, time) { -->
 
-    n <- length(time)
-    (1/n) * sum((FUN(time) - log(v * time^(v - 1)))^2)
+<!--     n <- length(time) -->
+<!--     (1/n) * sum((FUN(time) - log(v * time^(v - 1)))^2) -->
 
-  }
+<!--   } -->
 
-  fun_grad <- function(v, time) {
+<!--   fun_grad <- function(v, time) { -->
 
-    n <- length(time)
-    (1/n) * sum(2 * (FUN(time) - log(v * time^(v - 1))) * -log(time))
+<!--     n <- length(time) -->
+<!--     (1/n) * sum(2 * (FUN(time) - log(v * time^(v - 1))) * -log(time)) -->
 
-  }
+<!--   } -->
 
-  res <- constrOptim(c(.001, .001), fun_diff, fun_grad, ui = rbind(c(1,0), c(1,0)), ci = c(.0001, .0001), time = time)
+<!--   res <- constrOptim(c(.001, .001), fun_diff, fun_grad, ui = rbind(c(1,0), c(1,0)), ci = c(.0001, .0001), time = time) -->
 
-  return(list(shape = res$par[1], scale = lambda))
+<!--   return(list(shape = res$par[1], scale = lambda)) -->
 
-}
-```
+<!-- } -->
+<!-- ``` -->
 
 ```{r}
 #' Simulate survival times with censoring, based on a weibull baseline hazard
@@ -64,8 +65,10 @@ estimate_weibull <- function(intercept, FUN) {
 #' simulated for user-given covariates and coefficients.
 #' @param x model matrix (including intercept) of x-values for the Cox model of survival times
 #' @param fcts_select subset of fcts from a hare object containing the coefficients of interest. 
-#' @param params parameters shape and scale for the baseline Weibull distribution, by default the exponential distribution with scale = 1
-#' @param FUN random generation function for the distribution of censoring times, expected to be uniform, exponential, or weibull. 
+#' @param params parameters shape and scale for the baseline Weibull distribution, 
+#' by default the exponential distribution with scale = 1
+#' @param FUN random generation function for the distribution of censoring times, 
+#' expected to be uniform, exponential, or weibull. 
 #' @param ... arguments for FUN, the random generation function
 #' @return dataframe appending survival time and censoring indicator to the model matrix x
 #' @export
@@ -85,14 +88,20 @@ simulate_weibull <- function(x, fcts_select, params = list(shape = 1, scale = 1)
   u <- runif(n)
   time <- (-log(u) / (params$scale * exp(x_select %*% betas)))^(1 / params$shape)
   
-  # Censoring
-  # **
-  cid <- sample(c(0, 1), size = n, replace = TRUE, prob = c(.75, .25))
-  
+  # Winsorising tiny values for time (smaller than one day on a yearly-scale, e.g. 1 / 365.242),
+  # and adding a tiny amount of white noise not to have too many concurrent values
+  time <- ifelse(time < 1 / 365.242, 1 / 365.242, time)
+  time[time == 1 / 365.242] <- time[time == 1 / 365.242] + 
+    rnorm(length(time[time == 1 / 365.242]), mean = 0, sd = 1e-4)
+  # ...and make sure that the resulting value is positive
   time <- abs(time)
   
+  # Censoring
+  # to be implemented later
+  cid <- sample(c(0, 1), size = n, replace = TRUE, prob = c(.75, .25))
+  
   # return a dataframe
-  data.frame(time, cid, x, junk1 = rnorm(n), junk2 = rnorm(n), junk3 = rnorm(n), junk4 = rnorm(n), junk5 = rnorm(n), junk6 = rnorm(n), junk7 = rnorm(n), junk8 = rnorm(n), junk9 = rnorm(n), junk10 = rnorm(n))
+  data.frame(time, cid, x)
 }
 ```
 
@@ -147,29 +156,30 @@ fcts_select <- fcts[fcts[,2] == 0 & is.na(fcts[,3]),]
 <!-- } -->
 
 <!-- # FUN_grad <- function(time) { -->
-<!-- #    -->
+<!-- # -->
 <!-- #   output <- rep(0, length(time)) -->
-<!-- #    -->
+<!-- # -->
 <!-- #   time_knots <- nphm_hare$knots[1,-1] -->
-<!-- #    -->
+<!-- # -->
 <!-- #   knot_coefs <- fcts_time[,5][fcts_time[,2] != 0] -->
 <!-- #   knot_coefs <- knot_coefs[order(fcts_time[,2][fcts_time[,2] != 0])] -->
-<!-- #    -->
+<!-- # -->
 <!-- #   i <- 1 -->
-<!-- #    -->
+<!-- # -->
 <!-- #   for (tk in time_knots) { -->
-<!-- #      -->
+<!-- # -->
 <!-- #     output <- ifelse(time < tk, output - knot_coefs[i], output) -->
-<!-- #      -->
+<!-- # -->
 <!-- #     i <- i + 1 -->
-<!-- #      -->
+<!-- # -->
 <!-- #   } -->
-<!-- #    -->
+<!-- # -->
 <!-- #   return(output) -->
-<!-- #    -->
+<!-- # -->
 <!-- # } -->
 
-<!-- params <- estimate_weibull(intercept, FUN) -->
+<!-- ## estimate_weibull -->
+<!-- # params <- estimate_weibull(intercept, FUN) -->
 <!-- ``` -->
 
 <!-- ```{r} -->
@@ -177,21 +187,41 @@ fcts_select <- fcts[fcts[,2] == 0 & is.na(fcts[,3]),]
 
 <!-- plot(time, FUN(time), type = "l", ylim = c(-2.5, 2)) -->
 
-<!-- lines(time, log(params$shape * time^(params$shape - 1)), type = "l", col = "red") -->
+<!-- ## estimate_weibull -->
+<!-- # lines(time, log(params$shape * time^(params$shape - 1)), type = "l", col = "red") -->
 
+<!-- lines(time, log(parm_res$pars[2] * time^(parm_res$pars[2] - 1)), type = "l", col = "red") -->
 <!-- ``` -->
 
-
+## Using arbitrary Weibull parameter values to get similar survival times as original study
 
 ```{r}
-set.seed(513)
+set.seed(2)
 
 sim_mat <- simulate_weibull(x, fcts_select, params = list(shape = 500, scale = 1))
 
 summary(sim_mat$time)
-
-head(sim_mat)
 ```
+
+## Using Weibull parameter estimates from fit.Weibull and rhare
+
+```{r}
+set.seed(1)
+
+parm_res <- fit.Weibull(rhare(100000, cov = rep(0, nphm_hare$ncov), nphm_hare), dist="Weibull")
+```
+
+```{r}
+set.seed(2)
+
+sim_mat2 <- simulate_weibull(x, fcts_select, 
+                             params = list(shape = parm_res$pars[2],
+                                           scale = parm_res$pars[1]))
+
+summary(sim_mat2$time)
+```
+
+
 
 # Coxph Simulation
 
@@ -201,37 +231,60 @@ phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
 phm_sim_mat
 ```
 
-
-
-# Repeat Simulation Many times
-
 ```{r, warning = FALSE}
-set.seed(407)
+phm_sim_mat2 <- coxph(Surv(time, cid) ~ ., data = sim_mat2)
 
-num1 <- 0
-num2 <- 0
-num3 <- 0
-num4 <- 0
-num5 <- 0
-num6 <- 0
-num7 <- 0
-num8 <- 0
-num9 <- 0
-
-for (i in 1:100) {
-  
-  sim <- simulate_weibull(x, fcts_select, params = list(shape = 500, scale = 1))
-  phm_sim <- coxph(Surv(time, cid) ~ ., data = sim_mat)
-  
-  phm_sum <- summary(phm_sim)
-  
-  min(phm_sum$coefficients[17:26,5])
-  
-  phm_sum
-  
-}
-
+phm_sim_mat2
 ```
+
+Whether I use the arbitrary parameters shape = 500, scale = 1, or the estimated parameters shape = 262.4285, scale = 1.008144, the Cox proportional hazards model returns the same results. As long as the shape parameter is high, the Cox proportional hazards model is robust to small perturbations in the parameter values. 
+
+
+
+# Glmnet Simulation
+
+```{r}
+cv_phmnet <- cv.glmnet(as.matrix(sim_mat2[-c(1,2)]), 
+                       Surv(sim_mat2$time, sim_mat2$cid),
+                       family = "cox", alpha = .95)
+```
+
+```{r}
+coefficients(cv_phmnet)
+```
+
+
+
+
+<!-- # Repeat Simulation Many times -->
+
+<!-- ```{r, warning = FALSE} -->
+<!-- set.seed(3) -->
+
+<!-- num1 <- 0 -->
+<!-- num2 <- 0 -->
+<!-- num3 <- 0 -->
+<!-- num4 <- 0 -->
+<!-- num5 <- 0 -->
+<!-- num6 <- 0 -->
+<!-- num7 <- 0 -->
+<!-- num8 <- 0 -->
+<!-- num9 <- 0 -->
+
+<!-- for (i in 1:100) { -->
+
+<!--   sim <- simulate_weibull(x, fcts_select, params = list(shape = 500, scale = 1)) -->
+<!--   phm_sim <- coxph(Surv(time, cid) ~ ., data = sim_mat) -->
+
+<!--   phm_sum <- summary(phm_sim) -->
+
+<!--   min(phm_sum$coefficients[17:26,5]) -->
+
+<!--   phm_sum -->
+
+<!-- } -->
+
+<!-- ``` -->
 
 
 
