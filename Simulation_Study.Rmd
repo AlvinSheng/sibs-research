@@ -96,12 +96,12 @@ fcts_select <- fcts[fcts[,2] == 0 & is.na(fcts[,3]),]
 ```{r}
 set.seed(2)
 
-sim_mat <- simulate_weibull(x, fcts_select, params = list(shape = 500, scale = 1),
+test_sim_mat <- simulate_weibull(x, fcts_select, params = list(shape = 500, scale = 1),
                             FUN = rexp, 1.3)
 
-summary(sim_mat$time)
+summary(test_sim_mat$time)
 
-mean(sim_mat$cid)
+mean(test_sim_mat$cid)
 ```
 
 ## Using Weibull parameter estimates from fit.Weibull
@@ -115,14 +115,14 @@ parm_res <- fit.Weibull(rhare(100000, cov = rep(0, nphm_hare$ncov), nphm_hare), 
 ```{r}
 set.seed(2)
 
-sim_mat2 <- simulate_weibull(x, fcts_select, 
+sim_mat <- simulate_weibull(x, fcts_select, 
                              params = list(shape = parm_res$pars[2],
                                            scale = parm_res$pars[1]), 
                              FUN = rexp, 1.3)
 
-summary(sim_mat2$time)
+summary(sim_mat$time)
 
-mean(sim_mat2$cid)
+mean(sim_mat$cid)
 ```
 
 
@@ -132,17 +132,17 @@ mean(sim_mat2$cid)
 ## Using arbitrary Weibull parameter values
 
 ```{r, warning = FALSE}
-phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
+phm_test_sim_mat <- coxph(Surv(time, cid) ~ ., data = test_sim_mat)
 
-phm_sim_mat
+phm_test_sim_mat
 ```
 
 ## Using Weibull parameter estimates from fit.Weibull
 
 ```{r, warning = FALSE}
-phm_sim_mat2 <- coxph(Surv(time, cid) ~ ., data = sim_mat2)
+phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
 
-phm_sim_mat2
+phm_sim_mat
 ```
 
 
@@ -152,7 +152,7 @@ phm_sim_mat2
 The Weibull model should be more powerful (with less variance in the coefficient estimates) than the Cox Proportional Hazards model, as the data is from a Weibull distribution. The coefficient estimates themselves should be similar.
 
 ```{r}
-summary(survreg(Surv(time, cid) ~ ., data = sim_mat2))
+summary(survreg(Surv(time, cid) ~ ., data = sim_mat))
 ```
 
 For coefficients with very low p-values (p < 2e-16) according to the coxph model, the values from the Weibull model are approximately equal to those from the coxph model divided by 100. 
@@ -162,8 +162,8 @@ For coefficients with very low p-values (p < 2e-16) according to the coxph model
 # Glmnet Simulation
 
 ```{r}
-cv_phmnet <- cv.glmnet(as.matrix(sim_mat2[-c(1,2)]), 
-                       Surv(sim_mat2$time, sim_mat2$cid),
+cv_phmnet <- cv.glmnet(as.matrix(sim_mat[-c(1,2)]), 
+                       Surv(sim_mat$time, sim_mat$cid),
                        family = "cox", alpha = .95)
 ```
 
