@@ -147,6 +147,18 @@ phm_sim_mat2
 
 
 
+# Weibull model (to compare with Coxph)
+ 
+The Weibull model should be more powerful (with less variance in the coefficient estimates) than the Cox Proportional Hazards model, as the data is from a Weibull distribution. The coefficient estimates themselves should be similar.
+
+```{r}
+summary(survreg(Surv(time, cid) ~ ., data = sim_mat2))
+```
+
+For coefficients with very low p-values (p < 2e-16) according to the coxph model, the values from the Weibull model are approximately equal to those from the coxph model divided by 100. 
+
+
+
 # Glmnet Simulation
 
 ```{r}
