@@ -13,6 +13,8 @@ library(polspline)
 library(knitr)
 library(EnvStats)
 library(bda)
+library(tictoc)
+library(abind)
 ```
 
 # Simulating Survival Time with a Weibull Distribution
@@ -78,8 +80,6 @@ x <- model.matrix( ~ trt + age + wtkg + hemo + drugs +
                      karnof + oprior + preanti + race +
                      gender + symptom + offtrt + cd40 +
                      cd80, actg175)[,-1]
-
-# x <- readRDS("actg175_mat.rds")
 
 nphm_hare <- readRDS("nphm_hare.rds")
 
@@ -170,7 +170,33 @@ cv_phmnet <- cv.glmnet(as.matrix(sim_mat[-c(1,2)]),
 ```
 
 ```{r}
-coefficients(cv_phmnet)
+coef(cv_phmnet, s = cv_phmnet$lambda.1se)
+```
+
+
+
+# PH HARE Simulation
+
+```{r}
+phm_hare <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]), prophaz = TRUE)
+
+# extracting the coefficients for basis functions 
+# that do not correspond to time, knots, and/or tensor products
+fcts <- phm_hare$fcts
+fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
+```
+
+
+
+# PH HARE Simulation
+
+```{r}
+nphm_hare_sim <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]))
+
+# extracting the coefficients for basis functions 
+# that do not correspond to time, knots, and/or tensor products
+fcts <- nphm_hare_sim$fcts
+fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
 ```
 
 
@@ -199,13 +225,51 @@ simulate_regression <- function(N, p, simulate_fun = simulate_weibull, ...) {
     
     sim_mat <- simulate_fun(...)
     
+    
+    # Cox Proportional Hazards model
     phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
     
     s_phm_sim_mat <- summary(phm_sim_mat)
     
-    # only storing the coefficient values
+    # only storing the coefficient values for which the p-value is <= .05
     res[s_phm_sim_mat$coefficients[,5] <= .05, 1, i] <-
       phm_sim_mat$coefficients[s_phm_sim_mat$coefficients[,5] <= .05]
+    
+    
+    # Penalized Proportional Hazards model
+    cv_phmnet <- cv.glmnet(as.matrix(sim_mat[-c(1,2)]), 
+                           Surv(sim_mat$time, sim_mat$cid),
+                           family = "cox", alpha = .95)
+    
+    selected_coef <- as.numeric(coef(cv_phmnet, s = cv_phmnet$lambda.1se))
+    
+    res[selected_coef != 0, 2, i] <- selected_coef[selected_coef != 0]
+    
+    
+    
+    # PH HARE model
+    phm_hare <- hare(sim_mat$time, sim_mat$cid, 
+                     as.matrix(sim_mat[-c(1,2)]), prophaz = TRUE)
+    
+    # extracting the coefficients for basis functions 
+    # that do not correspond to time, knots, and/or tensor products
+    fcts <- phm_hare$fcts
+    fcts_select <- fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
+    
+    res[fcts_select[,1], 3, i] <- fcts_select[,5]
+    
+    
+    
+    # non-PH HARE model 
+    nphm_hare <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]))
+    
+    # extracting the coefficients for basis functions 
+    # that do not correspond to time, knots, and/or tensor products
+    nphm_fcts <- nphm_hare$fcts
+    nphm_fcts_select <- nphm_fcts[nphm_fcts[,1] != 0 &
+                                    nphm_fcts[,2] == 0 & is.na(nphm_fcts[,3]),]
+    
+    res[nphm_fcts_select[,1], 4, i] <- nphm_fcts_select[,5]
     
   }
   
@@ -214,16 +278,63 @@ simulate_regression <- function(N, p, simulate_fun = simulate_weibull, ...) {
 }
 ```
 
-Testing simulate_regression function
+I group the simulate_regression in groups of hundred to make it easier for R to handle. The total is 500 simulations. 
 
 ```{r}
 set.seed(636)
 
-sr_test <- simulate_regression(N = 500, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
-                    params = list(shape = parm_res$pars[2],
-                                  scale = parm_res$pars[1]), 
-                    FUN = rexp, rate = 1.3)
+tic()
+sims <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+                               params = list(shape = parm_res$pars[2],
+                                             scale = parm_res$pars[1]), 
+                               FUN = rexp, rate = 1.3)
 
+save(sims, file = "sims1.RData")
+toc()
+
+tic()
+sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+                               params = list(shape = parm_res$pars[2],
+                                             scale = parm_res$pars[1]), 
+                               FUN = rexp, rate = 1.3)
+
+sims <- abind(sims, sims_next)
+
+save(sims, file = "sims2.RData")
+toc()
+
+tic()
+sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+                               params = list(shape = parm_res$pars[2],
+                                             scale = parm_res$pars[1]), 
+                               FUN = rexp, rate = 1.3)
+
+sims <- abind(sims, sims_next)
+
+save(sims, file = "sims3.RData")
+toc()
+
+tic()
+sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+                               params = list(shape = parm_res$pars[2],
+                                             scale = parm_res$pars[1]), 
+                               FUN = rexp, rate = 1.3)
+
+sims <- abind(sims, sims_next)
+
+save(sims, file = "sims4.RData")
+toc()
+
+tic()
+sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+                               params = list(shape = parm_res$pars[2],
+                                             scale = parm_res$pars[1]), 
+                               FUN = rexp, rate = 1.3)
+
+sims <- abind(sims, sims_next)
+
+save(sims, file = "sims5.RData")
+toc()
 ```
 
 If I use set.seed(3), then there would be an error regarding the fitter() function (something about NA/NaN/Inf""). But with this set.seed, the coxph model still works. 
