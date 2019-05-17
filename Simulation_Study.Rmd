@@ -25,7 +25,7 @@ This function is based on simulate_data in https://cran.r-project.org/web/packag
 #' This function simulates survival times with censoring, according to a weibull
 #' baseline hazard that the user parameterizes. The survival/censoring times are 
 #' simulated for user-given covariates and coefficients.
-#' @param x model matrix (including intercept) of x-values for the Cox model of survival times
+#' @param x model matrix of x-values for the Cox model of survival times
 #' @param fcts_select subset of fcts from a hare object containing the coefficients of interest. 
 #' @param params parameters shape and scale for the baseline Weibull distribution, 
 #' by default the exponential distribution with scale = 1
@@ -96,8 +96,10 @@ fcts_select <- fcts[fcts[,2] == 0 & is.na(fcts[,3]),]
 ```{r}
 set.seed(2)
 
-test_sim_mat <- simulate_weibull(x, fcts_select, params = list(shape = 500, scale = 1),
-                            FUN = rexp, 1.3)
+test_sim_mat <- simulate_weibull(x, fcts_select, 
+                                 params = list(shape = 500,
+                                               scale = 1),
+                                 FUN = rexp, 1.3)
 
 summary(test_sim_mat$time)
 
@@ -116,9 +118,9 @@ parm_res <- fit.Weibull(rhare(100000, cov = rep(0, nphm_hare$ncov), nphm_hare), 
 set.seed(2)
 
 sim_mat <- simulate_weibull(x, fcts_select, 
-                             params = list(shape = parm_res$pars[2],
-                                           scale = parm_res$pars[1]), 
-                             FUN = rexp, 1.3)
+                            params = list(shape = parm_res$pars[2],
+                                          scale = parm_res$pars[1]), 
+                            FUN = rexp, 1.3)
 
 summary(sim_mat$time)
 
@@ -148,7 +150,7 @@ phm_sim_mat
 
 
 # Weibull model (to compare with Coxph)
- 
+
 The Weibull model should be more powerful (with less variance in the coefficient estimates) than the Cox Proportional Hazards model, as the data is from a Weibull distribution. The coefficient estimates themselves should be similar.
 
 ```{r}
@@ -172,5 +174,60 @@ coefficients(cv_phmnet)
 ```
 
 
+
+# Simulating N Times
+
+```{r}
+#' Select and calculate coefficient estimates for Cox PH, penalized PH, HARE PH, 
+#' and HARE non-PH models based on N simulated data sets.
+#'
+#' This function calls the simulation function for the distribution of interest N
+#' times and calculates the corresponding regression coefficient estimates for 
+#' each simulated data set.
+#' @param N number of simulated data sets to fit the models to. 
+#' @param p number of covaraites in original dataset
+#' @param simulate_fun simulation function for the distribution of interest.
+#' @param ... arguments for simulate_fun
+#' @return p x 4 x N array containing the coefficient estimates for variables 
+#' selected among p initial variables by 4 models fitted on N data sets
+#' @export
+simulate_regression <- function(N, p, simulate_fun = simulate_weibull, ...) {
+  
+  res <- array(NA, dim = c(p, 4, N))
+  
+  for (i in 1:N) {
+    
+    sim_mat <- simulate_fun(...)
+    
+    phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
+    
+    s_phm_sim_mat <- summary(phm_sim_mat)
+    
+    # only storing the coefficient values
+    res[s_phm_sim_mat$coefficients[,5] <= .05, 1, i] <-
+      phm_sim_mat$coefficients[s_phm_sim_mat$coefficients[,5] <= .05]
+    
+  }
+  
+  return(res)
+  
+}
+```
+
+Testing simulate_regression function
+
+```{r}
+set.seed(636)
+
+sr_test <- simulate_regression(N = 500, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+                    params = list(shape = parm_res$pars[2],
+                                  scale = parm_res$pars[1]), 
+                    FUN = rexp, rate = 1.3)
+
+```
+
+If I use set.seed(3), then there would be an error regarding the fitter() function (something about NA/NaN/Inf""). But with this set.seed, the coxph model still works. 
+
+Regarding "Loglik converged before variable..." see https://stat.ethz.ch/pipermail/r-help/2008-September/174201.html. 
 
 
