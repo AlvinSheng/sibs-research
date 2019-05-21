@@ -278,67 +278,86 @@ simulate_regression <- function(N, p, simulate_fun = simulate_weibull, ...) {
 }
 ```
 
-I group the simulate_regression in groups of hundred to make it easier for R to handle. The total is 500 simulations. 
+I group the simulate_regression iterations in groups of a hundred each to make it easier for R to handle. The total is 500 simulations. 
 
 ```{r}
-set.seed(636)
-
-tic()
-sims <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
-                               params = list(shape = parm_res$pars[2],
-                                             scale = parm_res$pars[1]), 
-                               FUN = rexp, rate = 1.3)
-
-save(sims, file = "sims1.RData")
-toc()
-
-tic()
-sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
-                               params = list(shape = parm_res$pars[2],
-                                             scale = parm_res$pars[1]), 
-                               FUN = rexp, rate = 1.3)
-
-sims <- abind(sims, sims_next)
-
-save(sims, file = "sims2.RData")
-toc()
-
-tic()
-sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
-                               params = list(shape = parm_res$pars[2],
-                                             scale = parm_res$pars[1]), 
-                               FUN = rexp, rate = 1.3)
-
-sims <- abind(sims, sims_next)
-
-save(sims, file = "sims3.RData")
-toc()
-
-tic()
-sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
-                               params = list(shape = parm_res$pars[2],
-                                             scale = parm_res$pars[1]), 
-                               FUN = rexp, rate = 1.3)
-
-sims <- abind(sims, sims_next)
-
-save(sims, file = "sims4.RData")
-toc()
-
-tic()
-sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
-                               params = list(shape = parm_res$pars[2],
-                                             scale = parm_res$pars[1]), 
-                               FUN = rexp, rate = 1.3)
-
-sims <- abind(sims, sims_next)
-
-save(sims, file = "sims5.RData")
-toc()
+# set.seed(636)
+# 
+# tic()
+# sims <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+#                                params = list(shape = parm_res$pars[2],
+#                                              scale = parm_res$pars[1]), 
+#                                FUN = rexp, rate = 1.3)
+# 
+# save(sims, file = "sims1.RData")
+# toc()
+#
+# tic()
+# sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+#                                params = list(shape = parm_res$pars[2],
+#                                              scale = parm_res$pars[1]), 
+#                                FUN = rexp, rate = 1.3)
+# 
+# sims <- abind(sims, sims_next)
+# 
+# save(sims, file = "sims2.RData")
+# toc()
+# 
+# tic()
+# sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+#                                params = list(shape = parm_res$pars[2],
+#                                              scale = parm_res$pars[1]), 
+#                                FUN = rexp, rate = 1.3)
+# 
+# sims <- abind(sims, sims_next)
+# 
+# save(sims, file = "sims3.RData")
+# toc()
+# 
+# tic()
+# sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+#                                params = list(shape = parm_res$pars[2],
+#                                              scale = parm_res$pars[1]), 
+#                                FUN = rexp, rate = 1.3)
+# 
+# sims <- abind(sims, sims_next)
+# 
+# save(sims, file = "sims4.RData")
+# toc()
+# 
+# tic()
+# sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+#                                params = list(shape = parm_res$pars[2],
+#                                              scale = parm_res$pars[1]), 
+#                                FUN = rexp, rate = 1.3)
+# 
+# sims <- abind(sims, sims_next)
+# 
+# save(sims, file = "sims5.RData")
+# toc()
 ```
 
 If I use set.seed(3), then there would be an error regarding the fitter() function (something about NA/NaN/Inf""). But with this set.seed, the coxph model still works. 
 
 Regarding "Loglik converged before variable..." see https://stat.ethz.ch/pipermail/r-help/2008-September/174201.html. 
 
+
+
+```{r}
+load("sims1.RData")
+
+prop_weibull <- matrix(0, nrow = 16, ncol = 4)
+
+for (i in 1:16) {
+  
+  for (j in 1:4) {
+    
+    prop_weibull[i,j] <- sum(!is.na(sims[i, j,])) / dim(sims)[3]
+    
+  }
+  
+}
+
+prop_weibull
+```
 
