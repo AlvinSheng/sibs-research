@@ -61,7 +61,6 @@ simulate_weibull <- function(x, fcts_select, params = list(shape = 1, scale = 1)
   time <- abs(time)
   
   # Censoring
-  # cid <- sample(c(0, 1), size = n, replace = TRUE, prob = c(.75, .25))
   cid_time <- FUN(n, ...)
   
   cid <- ifelse(time <= cid_time, 1, 0)
@@ -124,10 +123,16 @@ sim_mat <- simulate_weibull(x, fcts_select,
 
 summary(sim_mat$time)
 
-mean(sim_mat$cid)
+# censoring rate for the simulated data set
+1 - mean(sim_mat$cid)
+
+# censoring rate for the original study
+1 - mean(actg175$cid)
+
+1 - mean(sim_mat$cid) == 1 - mean(actg175$cid)
 ```
 
-
+If I use a random seed of 1 in line 111, a random seed of 2 in line 117, and use the rate parameter of 1.3 in line 122, I get the exact same censoring rate as in the original study, which is very strange. 
 
 # Coxph Simulation
 
@@ -157,7 +162,7 @@ The Weibull model should be more powerful (with less variance in the coefficient
 summary(survreg(Surv(time, cid) ~ ., data = sim_mat))
 ```
 
-For coefficients with very low p-values (p < 2e-16) according to the coxph model, the values from the Weibull model are approximately equal to those from the coxph model divided by 100. 
+For coefficients with very low p-values (p < 2e-16) according to the coxph model, the values from the Weibull model are approximately equal to those from the coxph model divided by -100. 
 
 
 
@@ -188,7 +193,7 @@ fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
 
 
 
-# PH HARE Simulation
+# non-PH HARE Simulation
 
 ```{r}
 nphm_hare_sim <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]))
@@ -278,7 +283,7 @@ simulate_regression <- function(N, p, simulate_fun = simulate_weibull, ...) {
 }
 ```
 
-I group the simulate_regression iterations in groups of a hundred each to make it easier for R to handle. The total is 500 simulations. 
+I tried to do 500 simulate_regression iterations, but it was too much for R to handle. I do 100 simulations instead.
 
 ```{r}
 # set.seed(636)
@@ -291,58 +296,13 @@ I group the simulate_regression iterations in groups of a hundred each to make i
 # 
 # save(sims, file = "sims1.RData")
 # toc()
-#
-# tic()
-# sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
-#                                params = list(shape = parm_res$pars[2],
-#                                              scale = parm_res$pars[1]), 
-#                                FUN = rexp, rate = 1.3)
-# 
-# sims <- abind(sims, sims_next)
-# 
-# save(sims, file = "sims2.RData")
-# toc()
-# 
-# tic()
-# sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
-#                                params = list(shape = parm_res$pars[2],
-#                                              scale = parm_res$pars[1]), 
-#                                FUN = rexp, rate = 1.3)
-# 
-# sims <- abind(sims, sims_next)
-# 
-# save(sims, file = "sims3.RData")
-# toc()
-# 
-# tic()
-# sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
-#                                params = list(shape = parm_res$pars[2],
-#                                              scale = parm_res$pars[1]), 
-#                                FUN = rexp, rate = 1.3)
-# 
-# sims <- abind(sims, sims_next)
-# 
-# save(sims, file = "sims4.RData")
-# toc()
-# 
-# tic()
-# sims_next <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
-#                                params = list(shape = parm_res$pars[2],
-#                                              scale = parm_res$pars[1]), 
-#                                FUN = rexp, rate = 1.3)
-# 
-# sims <- abind(sims, sims_next)
-# 
-# save(sims, file = "sims5.RData")
-# toc()
 ```
 
 If I use set.seed(3), then there would be an error regarding the fitter() function (something about NA/NaN/Inf""). But with this set.seed, the coxph model still works. 
 
 Regarding "Loglik converged before variable..." see https://stat.ethz.ch/pipermail/r-help/2008-September/174201.html. 
 
-
-
+    Proportion of times each covariate is selected across the four models fitted on simulated survival times from the Weibull distribution (this will be Table 5a in the manuscript)
 ```{r}
 load("sims1.RData")
 
