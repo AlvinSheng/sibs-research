@@ -15,9 +15,10 @@ library(EnvStats)
 library(bda)
 library(tictoc)
 library(abind)
+library(fitdistrplus)
 ```
 
-# Simulating Survival Time with a Weibull Distribution
+# Function for Simulating Survival Time from a Weibull Distribution
 
 This function is based on simulate_data in https://cran.r-project.org/web/packages/rsimsum/vignettes/relhaz.html
 
@@ -25,9 +26,10 @@ This function is based on simulate_data in https://cran.r-project.org/web/packag
 #' Simulate survival times with censoring, based on a weibull baseline hazard
 #'
 #' This function simulates survival times with censoring, according to a weibull
-#' baseline hazard that the user parameterizes. The survival/censoring times are 
-#' simulated for user-given covariates and coefficients.
-#' @param x model matrix of x-values for the Cox model of survival times
+#' baseline hazard that the user parameterizes. The survival times are 
+#' simulated for user-given covariates and coefficients, and the censoring times
+#' are simulated for a user-given distribution.
+#' @param x model matrix of covariate values
 #' @param fcts_select subset of fcts from a hare object containing the coefficients of interest. 
 #' @param params parameters shape and scale for the baseline Weibull distribution, 
 #' by default the exponential distribution with scale = 1
@@ -72,6 +74,87 @@ simulate_weibull <- function(x, fcts_select, params = list(shape = 1, scale = 1)
 }
 ```
 
+# Function for Simulating Survival Time from a Log-normal Distribution
+
+```{r}
+#' Simulate survival times with censoring, based on a log-normal distribution
+#'
+#' This function simulates survival times with censoring, according to a log-normal distribution
+#' that the user parameterizes. The survival times are 
+#' simulated for user-given covariates and coefficients, and the censoring times
+#' are simulated for a user-given distribution.
+#' @param x model matrix of covariate values 
+#' @param fcts_select subset of fcts from a hare object containing the coefficients of interest. 
+#' @param params_not_off parameters for the baseline log-normal distribution of survival times,
+#' for the not off-treatment group (Offtrt = 0)
+#' @param params_off parameters for the baseline log-normal distribution of survival times,
+#' for the off-treatment group (Offtrt = 1)
+#' @param FUN random generation function for the distribution of censoring times, 
+#' expected to be uniform, exponential, or weibull. 
+#' @param ... arguments for FUN, the random generation function
+#' @return dataframe appending survival time and censoring indicator to the model matrix x
+#' @export
+simulate_lnorm <- function(x, fcts_select, params_not_off, params_off, FUN, ...) {
+  
+  n <- nrow(x)
+  
+  # extract unique list of covariates selected 
+  cov_nums <- sort(fcts_select[,1][fcts_select[,1] != 0])
+  cov_names <- colnames(x)[cov_nums]
+  x_select <- x[,cov_names]
+  
+  # extract the coefficient values from fcts_select
+  betas <- fcts_select[,5][fcts_select[,1] != 0]
+  
+  # Take out the offtrt covariate and offtrt coefficient from x_select and betas, because
+  # the simulation will be stratified on offtrt
+  x_select <- x_select[,-7]
+  betas <- betas[-7]
+  
+  # # simulate survival times according to Bender et al. (2005)
+  # u <- runif(n)
+  # time <- (-log(u) / (params$scale * exp(x_select %*% betas)))^(1 / params$shape)
+  
+  # simulate survival times based on the survsim package
+  time <- c()
+  # going row by row in the original ACTG-175 data set, simulating the survival time depending on
+  # whether Offtrt = 0 or 1.
+  for (i in 1:n) {
+    
+    if (x[i, 14] == 0) { # not off-treatment group
+      
+      time[i] <- rlnorm(1, params_not_off$meanlog + x_select[i,] %*% betas, params_not_off$sdlog)
+      
+    } else if (x[i, 14] == 1) { # off-treatment group
+      
+      time[i] <- rlnorm(1, params_off$meanlog + x_select[i,] %*% betas, params_off$sdlog)
+      
+    }
+    
+  }
+  
+  # Winsorising tiny values for time (smaller than one day on a yearly-scale, e.g. 1 / 365.242),
+  # and adding a tiny amount of white noise not to have too many concurrent values
+  time <- ifelse(time < 1 / 365.242, 1 / 365.242, time)
+  time[time == 1 / 365.242] <- time[time == 1 / 365.242] + 
+    rnorm(length(time[time == 1 / 365.242]), mean = 0, sd = 1e-4)
+  # ...and make sure that the resulting value is positive
+  time <- abs(time)
+  
+  # Censoring
+  cid_time <- FUN(n, ...)
+  
+  cid <- ifelse(time <= cid_time, 1, 0)
+  
+  time <- pmin(time, cid_time)
+  
+  # return a dataframe
+  data.frame(time, cid, x)
+}
+```
+
+# Setting up the requisite parameters for simulation
+
 ```{r}
 load("actg175.RData")
 
@@ -88,7 +171,7 @@ fcts <- nphm_hare$fcts
 fcts_select <- fcts[fcts[,2] == 0 & is.na(fcts[,3]),]
 ```
 
-
+# Generating example data set from the Weibull distribution 
 
 ## Using arbitrary Weibull parameter values to get similar survival times as original study
 
@@ -133,6 +216,40 @@ summary(sim_mat$time)
 ```
 
 If I use a random seed of 1 in line 111, a random seed of 2 in line 117, and use the rate parameter of 1.3 in line 122, I get the exact same censoring rate as in the original study, which is very strange. 
+
+
+
+# Generating example data set from the Log-normal distribution 
+
+```{r}
+set.seed(1)
+
+parm_res_not_off <- fitdist(rhare(100000, cov = rep(0, nphm_hare$ncov), nphm_hare), distr ="lnorm")
+
+set.seed(1)
+
+parm_res_off <- fitdist(rhare(100000, cov = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0),
+                            nphm_hare), distr ="lnorm")
+```
+
+```{r}
+set.seed(2)
+
+sim_mat_lnorm <- simulate_lnorm(x, fcts_select, 
+                                params_not_off = list(meanlog = parm_res_not_off$estimate[1],
+                                                      sdlog = parm_res_not_off$estimate[2]), 
+                                params_off = list(meanlog = parm_res_off$estimate[1],
+                                                      sdlog = parm_res_off$estimate[2]), 
+                                FUN = rexp, 1.3)
+
+summary(sim_mat_lnorm$time)
+
+# censoring rate for the simulated data set
+1 - mean(sim_mat_lnorm$cid)
+```
+
+
+
 
 # Coxph Simulation
 
@@ -216,7 +333,7 @@ fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
 #' times and calculates the corresponding regression coefficient estimates for 
 #' each simulated data set.
 #' @param N number of simulated data sets to fit the models to. 
-#' @param p number of covaraites in original dataset
+#' @param p number of covariates in original dataset
 #' @param simulate_fun simulation function for the distribution of interest.
 #' @param ... arguments for simulate_fun
 #' @return p x 4 x N array containing the coefficient estimates for variables 
@@ -302,7 +419,8 @@ If I use set.seed(3), then there would be an error regarding the fitter() functi
 
 Regarding "Loglik converged before variable..." see https://stat.ethz.ch/pipermail/r-help/2008-September/174201.html. 
 
-    Proportion of times each covariate is selected across the four models fitted on simulated survival times from the Weibull distribution (this will be Table 5a in the manuscript)
+    Proportion of times each covariate is selected across the four models fitted on simulated
+    survival times from the Weibull distribution (this will be Table 5a in the manuscript)
 ```{r}
 load("sims1.RData")
 
