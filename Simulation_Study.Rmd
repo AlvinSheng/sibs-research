@@ -86,7 +86,7 @@ simulate_weibull <- function(x, fcts_select, params = list(shape = 1, scale = 1)
 #' are simulated for a user-given distribution.
 #' @param x model matrix of covariate values 
 #' @param fcts_select subset of fcts from a hare object containing the coefficients of interest. 
-#' @param params parameters shape and scale for the baseline log-normal distribution
+#' @param params parameters meanlog and sigma for the log-normal distribution
 #' @param FUN random generation function for the distribution of censoring times, 
 #' expected to be uniform, exponential, or weibull. 
 #' @param ... arguments for FUN, the random generation function
@@ -111,7 +111,11 @@ simulate_lnorm <- function(x, fcts_select, params, FUN, ...) {
   # whether Offtrt = 0 or 1.
   for (i in 1:n) {
     
-    time[i] <- rlnorm(1, params$meanlog + x_select[i,] %*% betas, params$sdlog)
+    z <- rnorm(1)
+    
+    # time[i] <- rlnorm(1, params$meanlog + x_select[i,] %*% betas, params$sdlog)
+    
+    time[i] <- exp(params$mean_log + x_select[i,] %*% betas + params$sigma * z)
     
   }
   
@@ -151,6 +155,11 @@ nphm_hare <- readRDS("nphm_hare.rds")
 # that do not correspond to knots and/or tensor products
 fcts <- nphm_hare$fcts
 fcts_select <- fcts[fcts[,2] == 0 & is.na(fcts[,3]),]
+
+# Standard Deviation of log(Survival Time), needed for the scale parameters of the 
+# simulating distributions
+
+sigma <- sd(log(actg175$time))
 ```
 
 # Generating example data set from the Weibull distribution 
@@ -208,7 +217,7 @@ set.seed(2)
 
 sim_mat_lnorm <- simulate_lnorm(x, fcts_select, 
                                 params = list(meanlog = -10,
-                                              sdlog = 1), 
+                                              sigma = sigma), 
                                 FUN = rexp, 1.3)
 
 summary(sim_mat_lnorm$time)
