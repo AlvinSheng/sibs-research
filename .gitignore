@@ -4,5 +4,4 @@
 .Ruserdata
 *.Rproj
 scratch.R
-sims2.RData
 sims3.RData

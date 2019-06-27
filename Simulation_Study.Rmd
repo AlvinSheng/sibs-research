@@ -86,16 +86,13 @@ simulate_weibull <- function(x, fcts_select, params = list(shape = 1, scale = 1)
 #' are simulated for a user-given distribution.
 #' @param x model matrix of covariate values 
 #' @param fcts_select subset of fcts from a hare object containing the coefficients of interest. 
-#' @param params_not_off parameters for the baseline log-normal distribution of survival times,
-#' for the not off-treatment group (Offtrt = 0)
-#' @param params_off parameters for the baseline log-normal distribution of survival times,
-#' for the off-treatment group (Offtrt = 1)
+#' @param params parameters shape and scale for the baseline log-normal distribution
 #' @param FUN random generation function for the distribution of censoring times, 
 #' expected to be uniform, exponential, or weibull. 
 #' @param ... arguments for FUN, the random generation function
 #' @return dataframe appending survival time and censoring indicator to the model matrix x
 #' @export
-simulate_lnorm <- function(x, fcts_select, params_not_off, params_off, FUN, ...) {
+simulate_lnorm <- function(x, fcts_select, params, FUN, ...) {
   
   n <- nrow(x)
   
@@ -123,15 +120,7 @@ simulate_lnorm <- function(x, fcts_select, params_not_off, params_off, FUN, ...)
   # whether Offtrt = 0 or 1.
   for (i in 1:n) {
     
-    if (x[i, 14] == 0) { # not off-treatment group
-      
-      time[i] <- rlnorm(1, params_not_off$meanlog + x_select[i,] %*% betas, params_not_off$sdlog)
-      
-    } else if (x[i, 14] == 1) { # off-treatment group
-      
-      time[i] <- rlnorm(1, params_off$meanlog + x_select[i,] %*% betas, params_off$sdlog)
-      
-    }
+    time[i] <- rlnorm(1, params$meanlog + x_select[i,] %*% betas, params$sdlog)
     
   }
   
@@ -224,40 +213,11 @@ If I use a random seed of 1 in line 111, a random seed of 2 in line 117, and use
 # Generating example data set from the Log-normal distribution 
 
 ```{r}
-set.seed(1)
-
-parm_res_not_off <- fitdist(rhare(100000, cov = rep(0, nphm_hare$ncov), nphm_hare), distr ="lnorm")
-
-set.seed(1)
-
-parm_res_off <- fitdist(rhare(100000, cov = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0),
-                              nphm_hare), distr ="lnorm")
-```
-
-```{r}
-support <- seq(0, 4, length.out = 1000)
-
-plot(support, dlnorm(support, meanlog = parm_res_not_off$estimate[1],
-                     sdlog = parm_res_not_off$estimate[2]), type = "l")
-
-lines(support, dlnorm(support, meanlog = parm_res_off$estimate[1],
-                      sdlog = parm_res_off$estimate[2]), type = "l", col = "red")
-
-plot(support, 1 - plnorm(support, meanlog = parm_res_not_off$estimate[1],
-                         sdlog = parm_res_not_off$estimate[2]), type = "l")
-
-lines(support, 1 - plnorm(support, meanlog = parm_res_off$estimate[1],
-                          sdlog = parm_res_off$estimate[2]), type = "l", col = "red")
-```
-
-```{r}
 set.seed(2)
 
 sim_mat_lnorm <- simulate_lnorm(x, fcts_select, 
-                                params_not_off = list(meanlog = parm_res_not_off$estimate[1],
-                                                      sdlog = parm_res_not_off$estimate[2]), 
-                                params_off = list(meanlog = parm_res_off$estimate[1],
-                                                  sdlog = parm_res_off$estimate[2]), 
+                                params = list(meanlog = -10,
+                                              sdlog = 1), 
                                 FUN = rexp, 1.3)
 
 summary(sim_mat_lnorm$time)
@@ -488,16 +448,16 @@ simulate_regression <- function(N, p, simulate_fun = simulate_weibull, ...) {
 I tried to do 500 simulate_regression iterations, but it was too much for R to handle. I do 100 simulations instead.
 
 ```{r}
-# set.seed(636)
-# 
-# tic()
-# sims <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select,
-#                                params = list(shape = parm_res$pars[2],
-#                                              scale = parm_res$pars[1]),
-#                                FUN = rexp, rate = 1.3)
-# 
-# save(sims, file = "sims1.RData")
-# toc()
+set.seed(636)
+
+tic()
+sims <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select,
+                            params = list(shape = parm_res$pars[2],
+                                          scale = parm_res$pars[1]),
+                            FUN = rexp, rate = 1.3)
+
+save(sims, file = "sims2.RData")
+toc()
 ```
 
 If I use set.seed(3), then there would be an error regarding the fitter() function (something about NA/NaN/Inf""). But with this set.seed, the coxph model still works. 
@@ -507,7 +467,7 @@ Regarding "Loglik converged before variable..." see https://stat.ethz.ch/piperma
 Proportion of times each covariate is selected across the four models fitted on simulated
 survival times from the Weibull distribution (this will be Table 5a in the manuscript)
 ```{r}
-load("sims1.RData")
+load("sims2.RData")
 
 prop_weibull <- matrix(0, nrow = 16, ncol = 4)
 
@@ -529,43 +489,25 @@ prop_weibull
 ## Log-normal distributed survival times
 
 ```{r}
-# set.seed(636)
-# 
-# tic()
-# sims <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_lnorm, x, fcts_select,
-#                                params_not_off = list(meanlog = parm_res_not_off$estimate[1],
-#                                                       sdlog = parm_res_not_off$estimate[2]), 
-#                                 params_off = list(meanlog = parm_res_off$estimate[1],
-#                                                       sdlog = parm_res_off$estimate[2]),
-#                                FUN = rexp, rate = 1.3)
-# 
-# save(sims, file = "sims_lnorm.RData")
-# toc()
+set.seed(636)
+
+tic()
+sims <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_lnorm, x, 
+                            fcts_select, params = list(meanlog = -10, sdlog = 1),
+                            FUN = rexp, rate = 1.3)
+
+save(sims, file = "sims_lnorm2.RData")
+toc()
 ```
 
-This simulation process took 417.356 seconds (~ 7 minutes). This error, "Convergence problems... stopping addition", occured 72 times. 
+This simulation process took 586.108 seconds (~ 10 minutes).
 
+ 
+
+    Proportion of times each covariate is selected across the four models fitted on simulated 
+    survival times from the Log-normal distribution (this will be Table 5c in the manuscript)
 ```{r}
-load("sims_lnorm.RData")
-
-num_no_cov <- 0
-
-for (k in 1:100) {
-  
-  if (sum(!is.na(sims[,3:4, k])) == 0) 
-    num_no_cov <- num_no_cov + 1
-  
-}
-
-num_no_cov
-```
-
-There were 36 simulations out of 100 in which Models 3 and 4 did not select any covariates. This must be related to the 72 instances of the "Convergence problems... stopping addition" error.  
-
-Proportion of times each covariate is selected across the four models fitted on simulated
-survival times from the Log-normal distribution (this will be Table 5c in the manuscript)
-```{r}
-load("sims_lnorm.RData")
+load("sims_lnorm2.RData")
 
 prop_lnorm <- matrix(0, nrow = 16, ncol = 4)
 
