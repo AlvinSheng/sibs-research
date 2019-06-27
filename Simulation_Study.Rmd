@@ -105,15 +105,6 @@ simulate_lnorm <- function(x, fcts_select, params, FUN, ...) {
   betas <- fcts_select[,5][fcts_select[,1] != 0]
   betas <- betas[order(fcts_select[,1][fcts_select[,1] != 0])]
   
-  # Take out the offtrt covariate and offtrt coefficient from x_select and betas, because
-  # the simulation will be stratified on offtrt
-  x_select <- x_select[,-7]
-  betas <- betas[-7]
-  
-  # # simulate survival times according to Bender et al. (2005)
-  # u <- runif(n)
-  # time <- (-log(u) / (params$scale * exp(x_select %*% betas)))^(1 / params$shape)
-  
   # simulate survival times based on the survsim package
   time <- c()
   # going row by row in the original ACTG-175 data set, simulating the survival time depending on
