@@ -414,9 +414,11 @@ if (length(ind) %% 2 != 0) {
 } else {
   mid <- ind[length(ind)/2] # arbitrarily choose lesser one
 }
-# top number, 1228, is the row name (row number of original matrix). Bottom number, 1380, is the actual row number.
+# top number, 1228, is the row name. Bottom number, 1380, is the actual row number. That is, actg175["1228",] and actg175[1380,] are equivalent.
 mid
 actg175_mat[mid,]
+
+cat("The 1380th patient has the patient id number 191627.")
 
 cat("\n")
 
@@ -430,6 +432,8 @@ if (length(ind) %% 2 != 0) {
 }
 mid
 actg175_mat[mid,]
+
+cat("The 1380th patient has the patient id number 950069.")
 
 cat("\n")
 
@@ -468,15 +472,15 @@ plot(nphm_hare, actg175_mat[1380,], what = "s", col = 1, ylim = c(.70,1), ylab =
 
 plot(nphm_hare, actg175_mat[575,], what = "s", col = 2, add = TRUE, lwd = 2)
 
-# patient with same offtrt value as row number 1380 but with other covariates being row 575's
-x1 <- actg175_mat[575,]
-x1[14] <- 0
-plot(nphm_hare, x1, what = "s", col = 1, lty = 2, add = TRUE, lwd = 2)
-
-# patient with same offtrt value as row number 575 but with other covariates being row 1380's
-x2 <- actg175_mat[1380,]
-x2[14] <- 1
-plot(nphm_hare, x2, what = "s", col = 2, lty = 2, add = TRUE, lwd = 2)
+# # patient with same offtrt value as row number 1380 but with other covariates being row 575's
+# x1 <- actg175_mat[575,]
+# x1[14] <- 0
+# plot(nphm_hare, x1, what = "s", col = 1, lty = 2, add = TRUE, lwd = 2)
+# 
+# # patient with same offtrt value as row number 575 but with other covariates being row 1380's
+# x2 <- actg175_mat[1380,]
+# x2[14] <- 1
+# plot(nphm_hare, x2, what = "s", col = 2, lty = 2, add = TRUE, lwd = 2)
 
 axis(1, at = seq(0, 3.5, by = .5))
 
@@ -486,12 +490,38 @@ abline(v = 1.3, lwd = 2)
 
 # legend("bottomleft",legend=c("1380th Patient, Offtrt = 0", "575th Patient, Offtrt = 1", "Modified 575th Patient, Offtrt = 0", "Modified 1380th Patient, Offtrt = 1"),col=c(1, 2, 1, 2), lty = c(1, 1, 2, 2), cex = .7)
 
-legend("bottomleft",legend = c("1380th Patient, Offtrt = 0", "575th Patient, Offtrt = 1", "Modified 575th Patient, Offtrt = 0", "Modified 1380th Patient, Offtrt = 1"),col=c(1, 2, 1, 2), lty = c(1, 1, 2, 2), lwd = 2)
+legend("bottomleft",legend = c("1380th Patient, Offtrt = 0", "575th Patient, Offtrt = 1"), col=c(1, 2), lty = c(1, 1), lwd = 2)
 ```
 
 The vertical lines indicate the knots of time when interacting with offtrt. See the nphm_hare output above.
 
 
+
+    Comparing Offtrt = 0 vs. Offtrt = 1, with other covariates mean-centered
+```{r}
+plot(nphm_hare, actg175_mat[1380,], what = "s", col = 1, ylim = c(.70,1), ylab = "Survival", xlab = "Years", xaxt="n", lwd = 2, cex.lab = 1.5)
+
+plot(nphm_hare, actg175_mat[575,], what = "s", col = 2, add = TRUE, lwd = 2)
+
+# # patient with same offtrt value as row number 1380 but with other covariates being row 575's
+# x1 <- actg175_mat[575,]
+# x1[14] <- 0
+# plot(nphm_hare, x1, what = "s", col = 1, lty = 2, add = TRUE, lwd = 2)
+# 
+# # patient with same offtrt value as row number 575 but with other covariates being row 1380's
+# x2 <- actg175_mat[1380,]
+# x2[14] <- 1
+# plot(nphm_hare, x2, what = "s", col = 2, lty = 2, add = TRUE, lwd = 2)
+
+axis(1, at = seq(0, 3.5, by = .5))
+
+abline(v = .61, lwd = 2)
+
+abline(v = 1.3, lwd = 2)
+
+
+legend("bottomleft",legend = c("1380th Patient, Offtrt = 0", "575th Patient, Offtrt = 1"), col=c(1, 2), lty = c(1, 1), lwd = 2)
+```
 
 
 

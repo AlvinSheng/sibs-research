@@ -49,6 +49,7 @@ simulate_weibull <- function(x, fcts_select, params = list(shape = 1, scale = 1)
   
   # extract the coefficient values from fcts_select
   betas <- fcts_select[,5][fcts_select[,1] != 0]
+  betas <- betas[order(fcts_select[,1][fcts_select[,1] != 0])]
   
   # simulate survival times according to Bender et al. (2005)
   u <- runif(n)
@@ -65,7 +66,7 @@ simulate_weibull <- function(x, fcts_select, params = list(shape = 1, scale = 1)
   # Censoring
   cid_time <- FUN(n, ...)
   
-  cid <- ifelse(time <= cid_time, 1, 0)
+  cid <- ifelse(time < cid_time, 1, 0)
   
   time <- pmin(time, cid_time)
   
@@ -105,6 +106,7 @@ simulate_lnorm <- function(x, fcts_select, params_not_off, params_off, FUN, ...)
   
   # extract the coefficient values from fcts_select
   betas <- fcts_select[,5][fcts_select[,1] != 0]
+  betas <- betas[order(fcts_select[,1][fcts_select[,1] != 0])]
   
   # Take out the offtrt covariate and offtrt coefficient from x_select and betas, because
   # the simulation will be stratified on offtrt
@@ -144,7 +146,7 @@ simulate_lnorm <- function(x, fcts_select, params_not_off, params_off, FUN, ...)
   # Censoring
   cid_time <- FUN(n, ...)
   
-  cid <- ifelse(time <= cid_time, 1, 0)
+  cid <- ifelse(time < cid_time, 1, 0)
   
   time <- pmin(time, cid_time)
   
@@ -229,23 +231,23 @@ parm_res_not_off <- fitdist(rhare(100000, cov = rep(0, nphm_hare$ncov), nphm_har
 set.seed(1)
 
 parm_res_off <- fitdist(rhare(100000, cov = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0),
-                            nphm_hare), distr ="lnorm")
+                              nphm_hare), distr ="lnorm")
 ```
 
 ```{r}
 support <- seq(0, 4, length.out = 1000)
 
 plot(support, dlnorm(support, meanlog = parm_res_not_off$estimate[1],
-     sdlog = parm_res_not_off$estimate[2]), type = "l")
+                     sdlog = parm_res_not_off$estimate[2]), type = "l")
 
 lines(support, dlnorm(support, meanlog = parm_res_off$estimate[1],
-     sdlog = parm_res_off$estimate[2]), type = "l", col = "red")
+                      sdlog = parm_res_off$estimate[2]), type = "l", col = "red")
 
 plot(support, 1 - plnorm(support, meanlog = parm_res_not_off$estimate[1],
-     sdlog = parm_res_not_off$estimate[2]), type = "l")
+                         sdlog = parm_res_not_off$estimate[2]), type = "l")
 
 lines(support, 1 - plnorm(support, meanlog = parm_res_off$estimate[1],
-     sdlog = parm_res_off$estimate[2]), type = "l", col = "red")
+                          sdlog = parm_res_off$estimate[2]), type = "l", col = "red")
 ```
 
 ```{r}
@@ -255,7 +257,7 @@ sim_mat_lnorm <- simulate_lnorm(x, fcts_select,
                                 params_not_off = list(meanlog = parm_res_not_off$estimate[1],
                                                       sdlog = parm_res_not_off$estimate[2]), 
                                 params_off = list(meanlog = parm_res_off$estimate[1],
-                                                      sdlog = parm_res_off$estimate[2]), 
+                                                  sdlog = parm_res_off$estimate[2]), 
                                 FUN = rexp, 1.3)
 
 summary(sim_mat_lnorm$time)
@@ -282,7 +284,9 @@ phm_test_sim_mat
 ```{r, warning = FALSE}
 phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
 
-phm_sim_mat
+summary(phm_sim_mat)
+
+cox.zph(phm_sim_mat)
 ```
 
 ## Log-normal distributed survival times
@@ -292,7 +296,7 @@ phm_sim_mat_lnorm <- coxph(Surv(time, cid) ~ ., data = sim_mat_lnorm)
 
 summary(phm_sim_mat_lnorm)
 
-print(cox.zph(phm_sim_mat_lnorm))
+cox.zph(phm_sim_mat_lnorm)
 ```
 
 Preanti instead of offtrt was determined to be the covariate violating the proportional hazards assumption.
@@ -327,8 +331,8 @@ coef(cv_phmnet, s = cv_phmnet$lambda.1se)
 
 ```{r}
 cv_phmnet_lnorm <- cv.glmnet(as.matrix(sim_mat_lnorm[-c(1,2)]), 
-                       Surv(sim_mat_lnorm$time, sim_mat_lnorm$cid),
-                       family = "cox", alpha = .95)
+                             Surv(sim_mat_lnorm$time, sim_mat_lnorm$cid),
+                             family = "cox", alpha = .95)
 ```
 
 ```{r}
@@ -384,6 +388,10 @@ nphm_hare_sim <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]))
 # cat("\n")
 # 
 # fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
+
+# Which covariates have an interaction with time (or a knot of it)?
+unique(fcts[fcts[,1] == 0 & !is.na(fcts[,3]), 3])
+
 ```
 
 
@@ -392,10 +400,13 @@ nphm_hare_sim <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]))
 ```{r}
 nphm_hare_sim_lnorm <- hare(sim_mat_lnorm$time, sim_mat_lnorm$cid, as.matrix(sim_mat_lnorm[-c(1,2)]))
 
-nphm_hare_sim_lnorm$fcts
+(fcts <- nphm_hare_sim_lnorm$fcts)
+
+# Which covariates have an interaction with time (or a knot of it)?
+unique(fcts[fcts[,1] == 0 & !is.na(fcts[,3]), 3])
 ```
 
-# Simulating N Times
+# Simulating N = 100 Times
 
 ```{r}
 #' Select and calculate coefficient estimates for Cox PH, penalized PH, HARE PH, 
@@ -431,7 +442,7 @@ simulate_regression <- function(N, p, simulate_fun = simulate_weibull, ...) {
     
     
     # Penalized Proportional Hazards model
-    cv_phmnet <- cv.glmnet(as.matrix(sim_mat[-c(1,2)]), 
+    cv_phmnet <- cv.glmnet(as.matrix(sim_mat[-c(1,2)]),
                            Surv(sim_mat$time, sim_mat$cid),
                            family = "cox", alpha = .95)
     
@@ -480,9 +491,9 @@ I tried to do 500 simulate_regression iterations, but it was too much for R to h
 # set.seed(636)
 # 
 # tic()
-# sims <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select, 
+# sims <- simulate_regression(N = 100, p = 16, simulate_fun = simulate_weibull, x, fcts_select,
 #                                params = list(shape = parm_res$pars[2],
-#                                              scale = parm_res$pars[1]), 
+#                                              scale = parm_res$pars[1]),
 #                                FUN = rexp, rate = 1.3)
 # 
 # save(sims, file = "sims1.RData")
@@ -493,8 +504,8 @@ If I use set.seed(3), then there would be an error regarding the fitter() functi
 
 Regarding "Loglik converged before variable..." see https://stat.ethz.ch/pipermail/r-help/2008-September/174201.html. 
 
-    Proportion of times each covariate is selected across the four models fitted on simulated
-    survival times from the Weibull distribution (this will be Table 5a in the manuscript)
+Proportion of times each covariate is selected across the four models fitted on simulated
+survival times from the Weibull distribution (this will be Table 5a in the manuscript)
 ```{r}
 load("sims1.RData")
 
@@ -551,8 +562,8 @@ num_no_cov
 
 There were 36 simulations out of 100 in which Models 3 and 4 did not select any covariates. This must be related to the 72 instances of the "Convergence problems... stopping addition" error.  
 
-    Proportion of times each covariate is selected across the four models fitted on simulated
-    survival times from the Log-normal distribution (this will be Table 5c in the manuscript)
+Proportion of times each covariate is selected across the four models fitted on simulated
+survival times from the Log-normal distribution (this will be Table 5c in the manuscript)
 ```{r}
 load("sims_lnorm.RData")
 
