@@ -107,15 +107,14 @@ simulate_lnorm <- function(x, fcts_select, params, FUN, ...) {
   
   # simulate survival times based on the survsim package
   time <- c()
-  # going row by row in the original ACTG-175 data set, simulating the survival time depending on
-  # whether Offtrt = 0 or 1.
+  
   for (i in 1:n) {
     
     z <- rnorm(1)
     
     # time[i] <- rlnorm(1, params$meanlog + x_select[i,] %*% betas, params$sdlog)
     
-    time[i] <- exp(params$mean_log + x_select[i,] %*% betas + params$sigma * z)
+    time[i] <- exp(params$meanlog + x_select[i,] %*% betas + params$sigma * z)
     
   }
   
