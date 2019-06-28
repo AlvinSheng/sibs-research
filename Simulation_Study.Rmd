@@ -31,14 +31,13 @@ This function is based on simulate_data in https://cran.r-project.org/web/packag
 #' are simulated for a user-given distribution.
 #' @param x model matrix of covariate values
 #' @param fcts_select subset of fcts from a hare object containing the coefficients of interest. 
-#' @param params parameters shape and scale for the baseline Weibull distribution, 
-#' by default the exponential distribution with scale = 1
+#' @param params parameters scale and sigma for the baseline Weibull distribution
 #' @param FUN random generation function for the distribution of censoring times, 
 #' expected to be uniform, exponential, or weibull. 
 #' @param ... arguments for FUN, the random generation function
 #' @return dataframe appending survival time and censoring indicator to the model matrix x
 #' @export
-simulate_weibull <- function(x, fcts_select, params = list(shape = 1, scale = 1), FUN, ...) {
+simulate_weibull <- function(x, fcts_select, params, FUN, ...) {
   
   n <- nrow(x)
   
@@ -51,9 +50,18 @@ simulate_weibull <- function(x, fcts_select, params = list(shape = 1, scale = 1)
   betas <- fcts_select[,5][fcts_select[,1] != 0]
   betas <- betas[order(fcts_select[,1][fcts_select[,1] != 0])]
   
-  # simulate survival times according to Bender et al. (2005)
-  u <- runif(n)
-  time <- (-log(u) / (params$scale * exp(x_select %*% betas)))^(1 / params$shape)
+  # simulate survival times
+  time <- c()
+  
+  for (i in 1:n) {
+    
+    u <- runif(1)
+    
+    z <- log(-log(u))
+    
+    time[i] <- exp(params$scale + x_select[i,] %*% betas + params$sigma * z)
+    
+  }
   
   # Winsorising tiny values for time (smaller than one day on a yearly-scale, e.g. 1 / 365.242),
   # and adding a tiny amount of white noise not to have too many concurrent values
@@ -105,7 +113,7 @@ simulate_lnorm <- function(x, fcts_select, params, FUN, ...) {
   betas <- fcts_select[,5][fcts_select[,1] != 0]
   betas <- betas[order(fcts_select[,1][fcts_select[,1] != 0])]
   
-  # simulate survival times based on the survsim package
+  # simulate survival times
   time <- c()
   
   for (i in 1:n) {
@@ -190,22 +198,15 @@ parm_res <- fit.Weibull(rhare(100000, cov = rep(0, nphm_hare$ncov), nphm_hare), 
 set.seed(2)
 
 sim_mat <- simulate_weibull(x, fcts_select, 
-                            params = list(shape = parm_res$pars[2],
-                                          scale = parm_res$pars[1]), 
-                            FUN = rexp, 1.3)
+                            params = list(scale = -11, 
+                                          sigma = sigma), 
+                            FUN = rexp, 3.3)
 
 summary(sim_mat$time)
 
 # censoring rate for the simulated data set
 1 - mean(sim_mat$cid)
-
-# censoring rate for the original study
-1 - mean(actg175$cid)
-
-1 - mean(sim_mat$cid) == 1 - mean(actg175$cid)
 ```
-
-If I use a random seed of 1 in line 111, a random seed of 2 in line 117, and use the rate parameter of 1.3 in line 122, I get the exact same censoring rate as in the original study, which is very strange. 
 
 
 
@@ -215,9 +216,9 @@ If I use a random seed of 1 in line 111, a random seed of 2 in line 117, and use
 set.seed(2)
 
 sim_mat_lnorm <- simulate_lnorm(x, fcts_select, 
-                                params = list(meanlog = -10,
+                                params = list(meanlog = -11,
                                               sigma = sigma), 
-                                FUN = rexp, 1.3)
+                                FUN = rexp, 2.1)
 
 summary(sim_mat_lnorm$time)
 
@@ -501,10 +502,10 @@ toc()
 
 This simulation process took 586.108 seconds (~ 10 minutes).
 
- 
 
-    Proportion of times each covariate is selected across the four models fitted on simulated 
-    survival times from the Log-normal distribution (this will be Table 5c in the manuscript)
+
+Proportion of times each covariate is selected across the four models fitted on simulated 
+survival times from the Log-normal distribution (this will be Table 5c in the manuscript)
 ```{r}
 load("sims_lnorm2.RData")
 
