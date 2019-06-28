@@ -125,9 +125,9 @@ parm_res <- fit.Weibull(rhare(100000, cov = rep(0, nphm_hare$ncov), nphm_hare), 
 set.seed(2)
 
 sim_mat <- simulate_dist(dist = "weibull", x, fcts_select, 
-                            params = list(scale = 3.347861e-140,
-                                          shape = parm_res$pars[2]), 
-                            FUN = rexp, .4)
+                         params = list(scale = 3.347861e-140,
+                                       shape = parm_res$pars[2]), 
+                         FUN = rexp, .4)
 
 summary(sim_mat$time)
 
@@ -320,7 +320,7 @@ unique(fcts[fcts[,1] == 0 & !is.na(fcts[,3]), 3])
 #' @export
 simulate_regression <- function(N, p, ...) {
   
-  res <- array(NA, dim = c(p, 4, N))
+  res <- array(NA, dim = c(p, 5, N))
   
   for (i in 1:N) {
     
@@ -371,6 +371,11 @@ simulate_regression <- function(N, p, ...) {
     
     res[nphm_fcts_select[,1], 4, i] <- nphm_fcts_select[,5]
     
+    # Covariates that have an interaction with time (or a knot of it)?
+    covxtime <- unique(nphm_fcts[nphm_fcts[,1] == 0 & !is.na(nphm_fcts[,3]), 3])
+    
+    res[covxtime, 5, i] <- 1
+    
   }
   
   return(res)
@@ -380,15 +385,13 @@ simulate_regression <- function(N, p, ...) {
 
 ## Weibull distributed survival times
 
-I tried to do 500 simulate_regression iterations, but it was too much for R to handle. I do 100 simulations instead.
-
 ```{r}
 set.seed(636)
 
 tic()
 sims <- simulate_regression(N = 100, p = 16, "weibull", x, 
                             fcts_select, params = list(scale = 3.347861e-140,
-                                          shape = parm_res$pars[2]),
+                                                       shape = parm_res$pars[2]),
                             FUN = rexp, rate = .4)
 
 save(sims, file = "sims2.RData")
@@ -400,11 +403,11 @@ toc()
 ```{r}
 load("sims2.RData")
 
-prop_weibull <- matrix(0, nrow = 16, ncol = 4)
+prop_weibull <- matrix(0, nrow = 16, ncol = 5)
 
 for (i in 1:16) {
   
-  for (j in 1:4) {
+  for (j in 1:5) {
     
     prop_weibull[i,j] <- sum(!is.na(sims[i, j,])) / dim(sims)[3]
     
@@ -438,11 +441,11 @@ toc()
 ```{r}
 load("sims_lnorm2.RData")
 
-prop_lnorm <- matrix(0, nrow = 16, ncol = 4)
+prop_lnorm <- matrix(0, nrow = 16, ncol = 5)
 
 for (i in 1:16) {
   
-  for (j in 1:4) {
+  for (j in 1:5) {
     
     prop_lnorm[i,j] <- sum(!is.na(sims[i, j,])) / dim(sims)[3]
     
