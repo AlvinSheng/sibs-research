@@ -121,17 +121,24 @@ sigma <- sd(log(actg175$time))
 I use arbitrary Weibull parameters to make the survival times and censoring rate be similar to those of the ACTG-175 data set.
 
 ```{r}
+set.seed(1)
+
+parm_res <- fit.Weibull(rhare(100000, cov = rep(0, nphm_hare$ncov), nphm_hare), dist="Weibull")
+```
+
+```{r}
 set.seed(2)
 
-sim_mat <- simulate_dist(dist = "weibull", x, fcts_select, 
-                         params = list(scale = -11, 
-                                       sigma = sigma), 
-                         FUN = rexp, 3.3)
+sim_mat <- simulate_weibull(x, fcts_select, 
+                            params = list(scale = 3.347861e-140,
+                                          shape = parm_res$pars[2]), 
+                            FUN = rexp, .4)
 
 summary(sim_mat$time)
 
 # censoring rate for the simulated data set
 1 - mean(sim_mat$cid)
+
 ```
 
 
