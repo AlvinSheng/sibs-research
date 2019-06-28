@@ -414,7 +414,7 @@ set.seed(636)
 tic()
 sims <- simulate_regression(N = 500, p = 16, "lnorm", x,  
                             fcts_select, params = list(scale = -11, sigma = sigma),
-                            FUN = rexp, rate = 1.3)
+                            FUN = rexp, rate = 2.1)
 
 save(sims, file = "sims_lnorm500.RData")
 toc()
