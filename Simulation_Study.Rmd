@@ -183,7 +183,11 @@ cox.zph(phm_sim_mat_lnorm)
 
 Preanti instead of offtrt was determined to be the covariate violating the proportional hazards assumption.
 
+
+
 # Weibull model (to compare with Coxph), (Weibull distributed survival times)
+
+## Weibull Distributed Survival Time
 
 The Weibull model should be more powerful (with less variance in the coefficient estimates) than the Cox Proportional Hazards model, as the data is from a Weibull distribution. The coefficient estimates themselves should be similar.
 
@@ -191,7 +195,15 @@ The Weibull model should be more powerful (with less variance in the coefficient
 summary(survreg(Surv(time, cid) ~ ., data = sim_mat))
 ```
 
-For coefficients with very low p-values (p < 2e-16) according to the coxph model, the values from the Weibull model are approximately equal to those from the coxph model divided by -100. 
+Has an error: "Ran out of iterations and did not converge." 
+
+## Log-normal Distributed Survival Time
+
+```{r}
+summary(survreg(Surv(time, cid) ~ ., data = sim_mat_lnorm))
+```
+
+For some reason Survreg works with the log-normal distributed survival times but not the Weibull-distributed survival times, ironically enough. 
 
 
 
@@ -275,6 +287,9 @@ nphm_hare_sim <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]))
 unique(fcts[fcts[,1] == 0 & !is.na(fcts[,3]), 3])
 
 ```
+
+The results here seem to be exactly the same as those for the PH HARE model
+
 
 
 ## Log-normal distributed survival times
@@ -380,12 +395,8 @@ save(sims, file = "sims2.RData")
 toc()
 ```
 
-If I use set.seed(3), then there would be an error regarding the fitter() function (something about NA/NaN/Inf""). But with this set.seed, the coxph model still works. 
-
-Regarding "Loglik converged before variable..." see https://stat.ethz.ch/pipermail/r-help/2008-September/174201.html. 
-
-Proportion of times each covariate is selected across the four models fitted on simulated
-survival times from the Weibull distribution (this will be Table 5a in the manuscript)
+    Proportion of times each covariate is selected across the four models fitted on simulated
+    survival times from the Weibull distribution (this will be Table 5a in the manuscript)
 ```{r}
 load("sims2.RData")
 
@@ -420,12 +431,10 @@ save(sims, file = "sims_lnorm2.RData")
 toc()
 ```
 
-This simulation process took 586.108 seconds (~ 10 minutes).
 
 
-
-Proportion of times each covariate is selected across the four models fitted on simulated 
-survival times from the Log-normal distribution (this will be Table 5c in the manuscript)
+    Proportion of times each covariate is selected across the four models fitted on simulated 
+    survival times from the Log-normal distribution (this will be Table 5b in the manuscript)
 ```{r}
 load("sims_lnorm2.RData")
 
@@ -444,4 +453,4 @@ for (i in 1:16) {
 prop_lnorm
 ```
 
-Update to do later: track how many times the tensor product with time (indicating violation of proportional hazards) was selected for a specific covariate (ideally Offtrt)
+Update to do later?: track how many times the tensor product with time (indicating violation of proportional hazards) was selected for a specific covariate (ideally Offtrt)
