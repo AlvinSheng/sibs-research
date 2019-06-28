@@ -242,13 +242,8 @@ coef(cv_phmnet_lnorm, s = cv_phmnet_lnorm$lambda.1se)
 ```{r}
 phm_hare <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]), prophaz = TRUE)
 
-# extracting the coefficients for basis functions 
-# that do not correspond to time, knots, and/or tensor products
 (fcts <- phm_hare$fcts)
 
-# cat("\n")
-# 
-# fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
 ```
 
 ## Log-normal distributed survival times
@@ -257,13 +252,8 @@ phm_hare <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]), prophaz
 phm_hare_lnorm <- hare(sim_mat_lnorm$time, sim_mat_lnorm$cid, 
                        as.matrix(sim_mat_lnorm[-c(1,2)]), prophaz = TRUE)
 
-# extracting the coefficients for basis functions 
-# that do not correspond to time, knots, and/or tensor products
 (fcts <- phm_hare_lnorm$fcts)
 
-# cat("\n")
-# 
-# fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
 ```
 
 
@@ -275,13 +265,7 @@ phm_hare_lnorm <- hare(sim_mat_lnorm$time, sim_mat_lnorm$cid,
 ```{r}
 nphm_hare_sim <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]))
 
-# extracting the coefficients for basis functions 
-# that do not correspond to time, knots, and/or tensor products
 (fcts <- nphm_hare_sim$fcts)
-
-# cat("\n")
-# 
-# fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
 
 # Which covariates have an interaction with time (or a knot of it)?
 unique(fcts[fcts[,1] == 0 & !is.na(fcts[,3]), 3])
@@ -315,8 +299,10 @@ unique(fcts[fcts[,1] == 0 & !is.na(fcts[,3]), 3])
 #' @param N number of simulated data sets to fit the models to. 
 #' @param p number of covariates in original dataset
 #' @param ... arguments for simulate_dist
-#' @return p x 4 x N array containing the coefficient estimates for variables 
-#' selected among p initial variables by 4 models fitted on N data sets
+#' @return p x 5 x N array containing the coefficient estimates for variables 
+#' selected among p initial variables by 4 models fitted on N data sets,
+#' as well as variables that the non-PH HARE model selects as having
+#' an interaction with time (violation of proportional hazards)
 #' @export
 simulate_regression <- function(N, p, ...) {
   
@@ -389,19 +375,19 @@ simulate_regression <- function(N, p, ...) {
 set.seed(636)
 
 tic()
-sims <- simulate_regression(N = 100, p = 16, "weibull", x, 
+sims <- simulate_regression(N = 500, p = 16, "weibull", x, 
                             fcts_select, params = list(scale = 3.347861e-140,
                                                        shape = parm_res$pars[2]),
                             FUN = rexp, rate = .4)
 
-save(sims, file = "sims2.RData")
+save(sims, file = "sims500.RData")
 toc()
 ```
 
     Proportion of times each covariate is selected across the four models fitted on simulated
     survival times from the Weibull distribution (this will be Table 5a in the manuscript)
 ```{r}
-load("sims2.RData")
+load("sims500.RData")
 
 prop_weibull <- matrix(0, nrow = 16, ncol = 5)
 
@@ -426,11 +412,11 @@ prop_weibull
 set.seed(636)
 
 tic()
-sims <- simulate_regression(N = 100, p = 16, "lnorm", x,  
+sims <- simulate_regression(N = 500, p = 16, "lnorm", x,  
                             fcts_select, params = list(scale = -11, sigma = sigma),
                             FUN = rexp, rate = 1.3)
 
-save(sims, file = "sims_lnorm2.RData")
+save(sims, file = "sims_lnorm500.RData")
 toc()
 ```
 
@@ -439,7 +425,7 @@ toc()
     Proportion of times each covariate is selected across the four models fitted on simulated 
     survival times from the Log-normal distribution (this will be Table 5b in the manuscript)
 ```{r}
-load("sims_lnorm2.RData")
+load("sims_lnorm500.RData")
 
 prop_lnorm <- matrix(0, nrow = 16, ncol = 5)
 
