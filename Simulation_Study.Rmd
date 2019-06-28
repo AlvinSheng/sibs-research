@@ -30,7 +30,7 @@ This function is based on simulate_data in https://cran.r-project.org/web/packag
 #' @param dist distribution for the survival times, expected to be "weibull" or "lnorm"
 #' @param x model matrix of covariate values
 #' @param fcts_select subset of fcts from a hare object containing the coefficients of interest. 
-#' @param params parameters scale and sigma for the baseline hazard
+#' @param params parameters scale and shape/sigma for the baseline hazard
 #' @param FUN random generation function for the distribution of censoring times, 
 #' expected to be uniform, exponential, or weibull. 
 #' @param ... arguments for FUN, the random generation function for the
@@ -51,25 +51,20 @@ simulate_dist <- function(dist, x, fcts_select, params, FUN, ...) {
   betas <- betas[order(fcts_select[,1][fcts_select[,1] != 0])]
   
   # simulate survival times
-  time <- c()
+  if (dist == "weibull") {
+    
+    # simulate survival times according to Bender et al. (2005)
+    u <- runif(n)
+    time <- (-log(u) / (params$scale * exp(x_select %*% betas)))^(1 / params$shape)
+    
+  } else if (dist == "lnorm") {
+    
+    z <- rnorm(n)
+    time <- exp(params$scale + x_select %*% betas + params$sigma * z)
+    
+  } else {stop("Unrecognized Distribution")}
   
-  for (i in 1:n) {
-    
-    if (dist == "weibull") {
-      
-      u <- runif(1)
-      
-      z <- -log(-log(u))
-      
-    } else if (dist == "lnorm") {
-      
-      z <- rnorm(1)
-      
-    } else {stop("Unrecognized Distribution")}
-    
-    time[i] <- exp(params$scale + x_select[i,] %*% betas + params$sigma * z)
-    
-  }
+  
   
   # Winsorising tiny values for time (smaller than one day on a yearly-scale, e.g. 1 / 365.242),
   # and adding a tiny amount of white noise not to have too many concurrent values
@@ -118,7 +113,7 @@ sigma <- sd(log(actg175$time))
 
 # Generating example data set from the Weibull distribution 
 
-I use arbitrary Weibull parameters to make the survival times and censoring rate be similar to those of the ACTG-175 data set.
+I calculate the Weibull shape parameter and use an arbitrary Weibull scale parameter to make the survival times and censoring rate be similar to those of the ACTG-175 data set.
 
 ```{r}
 set.seed(1)
@@ -129,7 +124,7 @@ parm_res <- fit.Weibull(rhare(100000, cov = rep(0, nphm_hare$ncov), nphm_hare), 
 ```{r}
 set.seed(2)
 
-sim_mat <- simulate_weibull(x, fcts_select, 
+sim_mat <- simulate_dist(dist = "weibull", x, fcts_select, 
                             params = list(scale = 3.347861e-140,
                                           shape = parm_res$pars[2]), 
                             FUN = rexp, .4)
@@ -145,7 +140,7 @@ summary(sim_mat$time)
 
 # Generating example data set from the Log-normal distribution 
 
-I use arbitrary log-normal parameters to make the survival times and censoring rate be similar to those of the ACTG-175 data set. Of note, the scale is the same, i.e. equal to -11. 
+I use an arbitrary log-normal scale parameter and a calculated sigma parameter to make the survival times and censoring rate be similar to those of the ACTG-175 data set. 
 
 ```{r}
 set.seed(2)
@@ -377,8 +372,9 @@ set.seed(636)
 
 tic()
 sims <- simulate_regression(N = 100, p = 16, "weibull", x, 
-                            fcts_select, params = list(scale = -11, sigma = sigma),
-                            FUN = rexp, rate = 1.3)
+                            fcts_select, params = list(scale = 3.347861e-140,
+                                          shape = parm_res$pars[2]),
+                            FUN = rexp, rate = .4)
 
 save(sims, file = "sims2.RData")
 toc()
