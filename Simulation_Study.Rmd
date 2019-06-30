@@ -89,6 +89,53 @@ simulate_dist <- function(dist, x, fcts_select, params, FUN, ...) {
 
 
 
+# Function for Simulating Survival Time from a HARE model
+
+```{r}
+#' Simulate survival times with censoring, based on a HARE model
+#'
+#' This function simulates survival times with censoring, according to a user-given 
+#' HARE model. The survival times are simulated for covariates provided by the user
+#' and coefficients provided by the HARE model, and the censoring times
+#' are simulated for a user-given distribution.
+#' @param x model matrix of covariate values
+#' @param fit hare object to generate survival times from 
+#' @param FUN random generation function for the distribution of censoring times, 
+#' expected to be uniform, exponential, or weibull. 
+#' @param ... arguments for FUN, the random generation function for the
+#' censoring distribution
+#' @return dataframe appending survival time and censoring indicator to the model matrix x
+#' @export
+simulate_hare <- function(x, fit, FUN, ...) {
+  
+  # simulate survival times
+
+  time <- rhare(1, x, fit)
+  
+  
+  
+  # Winsorising tiny values for time (smaller than one day on a yearly-scale, e.g. 1 / 365.242),
+  # and adding a tiny amount of white noise not to have too many concurrent values
+  time <- ifelse(time < 1 / 365.242, 1 / 365.242, time)
+  time[time == 1 / 365.242] <- time[time == 1 / 365.242] + 
+    rnorm(length(time[time == 1 / 365.242]), mean = 0, sd = 1e-4)
+  # ...and make sure that the resulting value is positive
+  time <- abs(time)
+  
+  # Censoring
+  cid_time <- FUN(n, ...)
+  
+  cid <- ifelse(time < cid_time, 1, 0)
+  
+  time <- pmin(time, cid_time)
+  
+  # return a dataframe
+  data.frame(time, cid, x)
+}
+```
+
+
+
 # Setting up the requisite parameters for simulation
 
 ```{r}
@@ -157,6 +204,33 @@ summary(sim_mat_lnorm$time)
 1 - mean(sim_mat_lnorm$cid)
 ```
 
+
+
+# Generating example data set from the HARE model 
+
+<!-- ```{r} -->
+<!-- set.seed(2) -->
+
+<!-- sim_mat_hare <- simulate_hare(x, nphm_hare,  -->
+<!--                                FUN = rexp, .6) -->
+
+<!-- summary(sim_mat_hare$time) -->
+
+<!-- # censoring rate for the simulated data set -->
+<!-- 1 - mean(sim_mat_hare$cid) -->
+<!-- ``` -->
+
+```{r}
+set.seed(2)
+
+sim_mat_hare <- simulate_hare(x, nphm_hare, 
+                               FUN = runif, 0, 3.3)
+
+summary(sim_mat_hare$time)
+
+# censoring rate for the simulated data set
+1 - mean(sim_mat_hare$cid)
+```
 
 
 
