@@ -15,6 +15,7 @@ library(EnvStats)
 library(tictoc)
 library(abind)
 library(bda)
+library(tryCatchLog)
 ```
 
 # Function for Simulating Survival Time from a Weibull or Log-normal Distribution
@@ -439,12 +440,13 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
     
     if (!hare_sim) {
       sim_mat <- simulate_dist(...)
-      }
+    }
     else {
       sim_mat <- simulate_hare(...)
-      }
+    }
     
-    try({
+    tryLog({
+      
       # Cox Proportional Hazards model
       phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
       
@@ -453,47 +455,49 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       # only storing the coefficient values for which the p-value is <= .05
       res[s_phm_sim_mat$coefficients[,5] <= .05, 1, i] <-
         phm_sim_mat$coefficients[s_phm_sim_mat$coefficients[,5] <= .05]
+      
+      
+      # Penalized Proportional Hazards model
+      cv_phmnet <- cv.glmnet(as.matrix(sim_mat[-c(1,2)]),
+                             Surv(sim_mat$time, sim_mat$cid),
+                             family = "cox", alpha = .95)
+      
+      selected_coef <- as.numeric(coef(cv_phmnet, s = cv_phmnet$lambda.1se))
+      
+      res[selected_coef != 0, 2, i] <- selected_coef[selected_coef != 0]
+      
+      
+      
+      # PH HARE model
+      phm_hare <- hare(sim_mat$time, sim_mat$cid, 
+                       as.matrix(sim_mat[-c(1,2)]), prophaz = TRUE)
+      
+      # extracting the coefficients for basis functions 
+      # that do not correspond to time, knots, and/or tensor products
+      fcts <- phm_hare$fcts
+      fcts_select <- fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
+      
+      res[fcts_select[,1], 3, i] <- fcts_select[,5]
+      
+      
+      
+      # non-PH HARE model 
+      nphm_hare <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]))
+      
+      # extracting the coefficients for basis functions 
+      # that do not correspond to time, knots, and/or tensor products
+      nphm_fcts <- nphm_hare$fcts
+      nphm_fcts_select <- nphm_fcts[nphm_fcts[,1] != 0 &
+                                      nphm_fcts[,2] == 0 & is.na(nphm_fcts[,3]),]
+      
+      res[nphm_fcts_select[,1], 4, i] <- nphm_fcts_select[,5]
+      
+      # Covariates that have an interaction with time (or a knot of it)?
+      covxtime <- unique(nphm_fcts[nphm_fcts[,1] == 0 & !is.na(nphm_fcts[,3]), 3])
+      
+      res[covxtime, 5, i] <- 1
+      
     })
-    
-    # Penalized Proportional Hazards model
-    cv_phmnet <- cv.glmnet(as.matrix(sim_mat[-c(1,2)]),
-                           Surv(sim_mat$time, sim_mat$cid),
-                           family = "cox", alpha = .95)
-    
-    selected_coef <- as.numeric(coef(cv_phmnet, s = cv_phmnet$lambda.1se))
-    
-    res[selected_coef != 0, 2, i] <- selected_coef[selected_coef != 0]
-    
-    
-    
-    # PH HARE model
-    phm_hare <- hare(sim_mat$time, sim_mat$cid, 
-                     as.matrix(sim_mat[-c(1,2)]), prophaz = TRUE)
-    
-    # extracting the coefficients for basis functions 
-    # that do not correspond to time, knots, and/or tensor products
-    fcts <- phm_hare$fcts
-    fcts_select <- fcts[fcts[,1] != 0 & fcts[,2] == 0 & is.na(fcts[,3]),]
-    
-    res[fcts_select[,1], 3, i] <- fcts_select[,5]
-    
-    
-    
-    # non-PH HARE model 
-    nphm_hare <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]))
-    
-    # extracting the coefficients for basis functions 
-    # that do not correspond to time, knots, and/or tensor products
-    nphm_fcts <- nphm_hare$fcts
-    nphm_fcts_select <- nphm_fcts[nphm_fcts[,1] != 0 &
-                                    nphm_fcts[,2] == 0 & is.na(nphm_fcts[,3]),]
-    
-    res[nphm_fcts_select[,1], 4, i] <- nphm_fcts_select[,5]
-    
-    # Covariates that have an interaction with time (or a knot of it)?
-    covxtime <- unique(nphm_fcts[nphm_fcts[,1] == 0 & !is.na(nphm_fcts[,3]), 3])
-    
-    res[covxtime, 5, i] <- 1
     
   }
   
@@ -593,3 +597,23 @@ toc()
 ```
 
 
+
+Proportion of times each covariate is selected across the four models fitted on simulated 
+    survival times from the Log-normal distribution (this will be Table 5b in the manuscript)
+```{r}
+load("sims_hare500.RData")
+
+prop_hare <- matrix(0, nrow = 16, ncol = 5)
+
+for (i in 1:16) {
+  
+  for (j in 1:5) {
+    
+    prop_hare[i,j] <- sum(!is.na(sims[i, j,])) / dim(sims)[3]
+    
+  }
+  
+}
+
+prop_hare
+```
