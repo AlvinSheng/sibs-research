@@ -108,8 +108,9 @@ simulate_dist <- function(dist, x, fcts_select, params, FUN, ...) {
 #' @export
 simulate_hare <- function(x, fit, FUN, ...) {
   
+  n <- nrow(x)
+  
   # simulate survival times
-
   time <- rhare(1, x, fit)
   
   
@@ -256,7 +257,15 @@ summary(phm_sim_mat_lnorm)
 cox.zph(phm_sim_mat_lnorm)
 ```
 
-Preanti instead of offtrt was determined to be the covariate violating the proportional hazards assumption.
+## Survival times from the HARE non-PH model
+
+```{r}
+phm_sim_mat_hare <- coxph(Surv(time, cid) ~ ., data = sim_mat_hare)
+
+summary(phm_sim_mat_hare)
+
+cox.zph(phm_sim_mat_hare)
+```
 
 
 
@@ -279,6 +288,12 @@ summary(survreg(Surv(time, cid) ~ ., data = sim_mat_lnorm))
 ```
 
 For some reason Survreg works with the log-normal distributed survival times but not the Weibull-distributed survival times, ironically enough. 
+
+## Survival times from the HARE non-PH model
+
+```{r}
+summary(survreg(Surv(time, cid) ~ ., data = sim_mat_hare))
+```
 
 
 
@@ -310,6 +325,20 @@ coef(cv_phmnet_lnorm, s = cv_phmnet_lnorm$lambda.1se)
 
 
 
+## Survival times from the HARE non-PH model
+
+```{r}
+cv_phmnet_hare <- cv.glmnet(as.matrix(sim_mat_hare[-c(1,2)]), 
+                             Surv(sim_mat_hare$time, sim_mat_hare$cid),
+                             family = "cox", alpha = .95)
+```
+
+```{r}
+coef(cv_phmnet_hare, s = cv_phmnet_hare$lambda.1se)
+```
+
+
+
 # PH HARE Simulation
 
 ## Weibull distributed survival times
@@ -317,7 +346,7 @@ coef(cv_phmnet_lnorm, s = cv_phmnet_lnorm$lambda.1se)
 ```{r}
 phm_hare <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]), prophaz = TRUE)
 
-(fcts <- phm_hare$fcts)
+phm_hare$fcts
 
 ```
 
@@ -327,7 +356,17 @@ phm_hare <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]), prophaz
 phm_hare_lnorm <- hare(sim_mat_lnorm$time, sim_mat_lnorm$cid, 
                        as.matrix(sim_mat_lnorm[-c(1,2)]), prophaz = TRUE)
 
-(fcts <- phm_hare_lnorm$fcts)
+phm_hare_lnorm$fcts
+
+```
+
+## Survival times from the HARE non-PH model
+
+```{r}
+phm_hare_hare <- hare(sim_mat_hare$time, sim_mat_hare$cid, 
+                       as.matrix(sim_mat_hare[-c(1,2)]), prophaz = TRUE)
+
+phm_hare_hare$fcts
 
 ```
 
@@ -349,8 +388,6 @@ unique(fcts[fcts[,1] == 0 & !is.na(fcts[,3]), 3])
 
 The results here seem to be exactly the same as those for the PH HARE model
 
-
-
 ## Log-normal distributed survival times
 
 ```{r}
@@ -361,6 +398,19 @@ nphm_hare_sim_lnorm <- hare(sim_mat_lnorm$time, sim_mat_lnorm$cid, as.matrix(sim
 # Which covariates have an interaction with time (or a knot of it)?
 unique(fcts[fcts[,1] == 0 & !is.na(fcts[,3]), 3])
 ```
+
+## Survival times from the HARE non-PH model
+
+```{r}
+nphm_hare_sim_hare <- hare(sim_mat_hare$time, sim_mat_hare$cid, as.matrix(sim_mat_hare[-c(1,2)]))
+
+(fcts <- nphm_hare_sim_hare$fcts)
+
+# Which covariates have an interaction with time (or a knot of it)?
+unique(fcts[fcts[,1] == 0 & !is.na(fcts[,3]), 3])
+```
+
+
 
 # Simulating N = 100 Times
 
@@ -373,19 +423,26 @@ unique(fcts[fcts[,1] == 0 & !is.na(fcts[,3]), 3])
 #' each simulated data set.
 #' @param N number of simulated data sets to fit the models to. 
 #' @param p number of covariates in original dataset
-#' @param ... arguments for simulate_dist
+#' @param hare_sim if TRUE, generate survival times from simulate_hare. 
+#' If FALSE (default), generate survival times from simulate_dist
+#' @param ... arguments for simulate_dist or simulate_hare
 #' @return p x 5 x N array containing the coefficient estimates for variables 
 #' selected among p initial variables by 4 models fitted on N data sets,
 #' as well as variables that the non-PH HARE model selects as having
 #' an interaction with time (violation of proportional hazards)
 #' @export
-simulate_regression <- function(N, p, ...) {
+simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
   
   res <- array(NA, dim = c(p, 5, N))
   
   for (i in 1:N) {
     
-    sim_mat <- simulate_dist(...)
+    if (!hare_sim) {
+      sim_mat <- simulate_dist(...)
+      }
+    else {
+      sim_mat <- simulate_hare(...)
+      }
     
     # Cox Proportional Hazards model
     phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
@@ -450,7 +507,7 @@ simulate_regression <- function(N, p, ...) {
 # set.seed(636)
 # 
 # tic()
-# sims <- simulate_regression(N = 500, p = 16, "weibull", x, 
+# sims <- simulate_regression(N = 500, p = 16, hare_sim = FALSE, "weibull", x, 
 #                             fcts_select, params = list(scale = 3.347861e-140,
 #                                                        shape = parm_res$pars[2]),
 #                             FUN = rexp, rate = .4)
@@ -489,7 +546,7 @@ prop_weibull
 # set.seed(636)
 # 
 # tic()
-# sims <- simulate_regression(N = 500, p = 16, "lnorm", x,  
+# sims <- simulate_regression(N = 500, p = 16, hare_sim = FALSE, "lnorm", x,  
 #                             fcts_select, params = list(scale = -11, sigma = sigma),
 #                             FUN = rexp, rate = 2.1)
 # 
@@ -519,4 +576,19 @@ for (i in 1:16) {
 prop_lnorm
 ```
 
-Update to do later?: track how many times the tensor product with time (indicating violation of proportional hazards) was selected for a specific covariate (ideally Offtrt)
+
+
+## Survival times from the HARE non-PH model
+
+```{r}
+set.seed(636)
+
+tic()
+sims <- simulate_regression(N = 500, p = 16, hare_sim = TRUE, x, nphm_hare, 
+                               FUN = runif, 0, 3.3)
+
+save(sims, file = "sims_hare500.RData")
+toc()
+```
+
+
