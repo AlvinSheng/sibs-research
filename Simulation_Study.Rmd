@@ -149,15 +149,16 @@ x <- model.matrix( ~ trt + age + wtkg + hemo + drugs +
                      cd80, actg175)[,-1]
 
 nphm_hare <- readRDS("nphm_hare.rds")
+```
 
+```{r}
 # extracting the coefficients for basis functions 
 # that do not correspond to knots and/or tensor products
 fcts <- nphm_hare$fcts
 fcts_select <- fcts[fcts[,2] == 0 & is.na(fcts[,3]),]
 
-# Standard Deviation of log(Survival Time), needed for the scale parameters of the 
-# simulating distributions
-
+# Standard Deviation of log(Survival Time), needed for the scale parameters
+# of the simulating distributions
 sigma <- sd(log(actg175$time))
 ```
 
@@ -595,6 +596,12 @@ sims <- simulate_regression(N = 500, p = 16, hare_sim = TRUE, x, nphm_hare,
 save(sims, file = "sims_hare500.RData")
 toc()
 ```
+
+There are 584 instances of "Convergence problems...stopping addition."
+
+There are 4 instances out of 500 where no models picked up anything. I think this is due to too much censoring. 
+
+There's 1 instance out of 500 where only the Cox model picked up something, but none of the other models did. 
 
 
 
