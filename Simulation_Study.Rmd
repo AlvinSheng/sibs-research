@@ -444,15 +444,16 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       sim_mat <- simulate_hare(...)
       }
     
-    # Cox Proportional Hazards model
-    phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
-    
-    s_phm_sim_mat <- summary(phm_sim_mat)
-    
-    # only storing the coefficient values for which the p-value is <= .05
-    res[s_phm_sim_mat$coefficients[,5] <= .05, 1, i] <-
-      phm_sim_mat$coefficients[s_phm_sim_mat$coefficients[,5] <= .05]
-    
+    try({
+      # Cox Proportional Hazards model
+      phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
+      
+      s_phm_sim_mat <- summary(phm_sim_mat)
+      
+      # only storing the coefficient values for which the p-value is <= .05
+      res[s_phm_sim_mat$coefficients[,5] <= .05, 1, i] <-
+        phm_sim_mat$coefficients[s_phm_sim_mat$coefficients[,5] <= .05]
+    })
     
     # Penalized Proportional Hazards model
     cv_phmnet <- cv.glmnet(as.matrix(sim_mat[-c(1,2)]),
