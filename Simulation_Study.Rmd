@@ -446,7 +446,25 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       sim_mat <- simulate_hare(...)
     }
     
-    
+    if (i == 124) {
+      
+      sim_mat_test <- sim_mat
+      
+      load("penalized_PH124.RData")
+      
+      if (all.equal(sim_mat_test, sim_mat)) {
+        
+        print("This sim_mat will lead to an abortion.")
+        
+        next
+        
+      } else {
+        
+        sim_mat <- sim_mat_test
+        
+      }
+      
+    }
     
     tryCatchLog({
       
@@ -622,7 +640,7 @@ prop_lnorm
 ## Survival times from the HARE non-PH model
 
 ```{r}
-set.seed(636)
+set.seed(3)
 
 tic()
 sims <- simulate_regression(N = 500, p = 16, hare_sim = TRUE, x, nphm_hare, 
