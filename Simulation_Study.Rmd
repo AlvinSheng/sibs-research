@@ -437,9 +437,20 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
   
   res <- array(NA, dim = c(p, 5, N))
   
-  
-  
-  tryCatchLog({
+  for (i in 1:N) {
+    
+    
+    
+    if (!hare_sim) {
+      sim_mat <- simulate_dist(...)
+    }
+    else {
+      sim_mat <- simulate_hare(...)
+    }
+    
+    
+    
+    tryCatchLog({
       
       # Cox Proportional Hazards model
       phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
@@ -452,21 +463,12 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
     }, error = function(e) {save(sim_mat, file = paste0("error_sim_mats/", "PH", i,".RData"))
       print(paste("error", i, "PH"))
-      }, 
+    }, 
     warning = function(w) {save(sim_mat, file = paste0("warning_sim_mats/", "PH", i,".RData"))
       print(paste("warning", i, "PH"))
-      })
-  
-  
-  
-  for (i in 1:N) {
+    })
     
-    if (!hare_sim) {
-      sim_mat <- simulate_dist(...)
-    }
-    else {
-      sim_mat <- simulate_hare(...)
-    }
+  
     
     if (i %in% c(124, 126, 169, 300, 322, 466, 497)) {
       
@@ -625,16 +627,16 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
 ## Weibull distributed survival times
 
 ```{r}
-# set.seed(636)
-# 
-# tic()
-# sims <- simulate_regression(N = 500, p = 16, hare_sim = FALSE, "weibull", x, 
-#                             fcts_select, params = list(scale = 3.347861e-140,
-#                                                        shape = parm_res$pars[2]),
-#                             FUN = rexp, rate = .4)
-# 
-# save(sims, file = "sims500.RData")
-# toc()
+set.seed(636)
+
+tic()
+sims <- simulate_regression(N = 500, p = 16, hare_sim = FALSE, "weibull", x,
+                            fcts_select, params = list(scale = 3.347861e-140,
+                                                       shape = parm_res$pars[2]),
+                            FUN = rexp, rate = .4)
+
+save(sims, file = "sims500.RData")
+toc()
 ```
 
 2880.832 sec elapsed
@@ -664,15 +666,15 @@ prop_weibull
 ## Log-normal distributed survival times
 
 ```{r}
-# set.seed(636)
-# 
-# tic()
-# sims <- simulate_regression(N = 500, p = 16, hare_sim = FALSE, "lnorm", x,  
-#                             fcts_select, params = list(scale = -11, sigma = sigma),
-#                             FUN = rexp, rate = 2.1)
-# 
-# save(sims, file = "sims_lnorm500.RData")
-# toc()
+set.seed(636)
+
+tic()
+sims <- simulate_regression(N = 500, p = 16, hare_sim = FALSE, "lnorm", x,
+                            fcts_select, params = list(scale = -11, sigma = sigma),
+                            FUN = rexp, rate = 2.1)
+
+save(sims, file = "sims_lnorm500.RData")
+toc()
 ```
 
 4112.399 sec elapsed
