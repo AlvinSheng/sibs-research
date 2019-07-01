@@ -446,7 +446,7 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       sim_mat <- simulate_hare(...)
     }
     
-    if (i == 124) {
+    if (i %in% c(124, 126)) {
       
       sim_mat_test <- sim_mat
       
@@ -458,11 +458,19 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
         
         next
         
-      } else {
+      } 
+      
+      load("penalized_PH126.RData")
+      
+      if (all.equal(sim_mat_test, sim_mat)) {
         
-        sim_mat <- sim_mat_test
+        print("This sim_mat will lead to an abortion.")
+        
+        next
         
       }
+      
+      sim_mat <- sim_mat_test
       
     }
     
