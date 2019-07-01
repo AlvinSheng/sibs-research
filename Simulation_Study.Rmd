@@ -474,7 +474,7 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       load("penalized_PH124.RData")
       
-      if (identical(sim_mat_test, sim_mat)) {
+      if (isTRUE(all.equal(sim_mat_test, sim_mat))) {
         
         print("This sim_mat will lead to an abortion.")
         
@@ -484,7 +484,7 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       load("penalized_PH126.RData")
       
-      if (identical(sim_mat_test, sim_mat)) {
+      if (isTRUE(all.equal(sim_mat_test, sim_mat))) {
         
         print("This sim_mat will lead to an abortion.")
         
@@ -494,7 +494,7 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       load("penalized_PH169.RData")
       
-      if (identical(sim_mat_test, sim_mat)) {
+      if (isTRUE(all.equal(sim_mat_test, sim_mat))) {
         
         print("This sim_mat will lead to an abortion.")
         
@@ -504,7 +504,7 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       load("penalized_PH300.RData")
       
-      if (identical(sim_mat_test, sim_mat)) {
+      if (isTRUE(all.equal(sim_mat_test, sim_mat))) {
         
         print("This sim_mat will lead to an abortion.")
         
@@ -514,7 +514,7 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       load("penalized_PH322.RData")
       
-      if (identical(sim_mat_test, sim_mat)) {
+      if (isTRUE(all.equal(sim_mat_test, sim_mat))) {
         
         print("This sim_mat will lead to an abortion.")
         
@@ -524,7 +524,7 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       load("penalized_PH466.RData")
       
-      if (identical(sim_mat_test, sim_mat)) {
+      if (isTRUE(all.equal(sim_mat_test, sim_mat))) {
         
         print("This sim_mat will lead to an abortion.")
         
@@ -534,7 +534,7 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       load("penalized_PH497.RData")
       
-      if (identical(sim_mat_test, sim_mat)) {
+      if (isTRUE(all.equal(sim_mat_test, sim_mat))) {
         
         print("This sim_mat will lead to an abortion.")
         
