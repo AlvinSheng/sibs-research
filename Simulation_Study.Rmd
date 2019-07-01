@@ -698,17 +698,17 @@ prop_lnorm
 ## Survival times from the HARE non-PH model
 
 ```{r}
-set.seed(3)
-
-tic()
-sims <- simulate_regression(N = 500, p = 16, hare_sim = TRUE, x, nphm_hare, 
-                               FUN = runif, 0, 3.3)
-
-save(sims, file = "sims_hare500.RData")
-toc()
+# set.seed(3)
+# 
+# tic()
+# sims <- simulate_regression(N = 500, p = 16, hare_sim = TRUE, x, nphm_hare, 
+#                                FUN = runif, 0, 3.3)
+# 
+# save(sims, file = "sims_hare500.RData")
+# toc()
 ```
 
-There are 584 instances of "Convergence problems...stopping addition."
+5413.029 sec elapsed
 
 
 
