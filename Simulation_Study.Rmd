@@ -452,7 +452,7 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       load("penalized_PH124.RData")
       
-      if (all.equal(sim_mat_test, sim_mat)) {
+      if (identical(sim_mat_test, sim_mat) == TRUE) {
         
         print("This sim_mat will lead to an abortion.")
         
@@ -462,7 +462,7 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       load("penalized_PH126.RData")
       
-      if (all.equal(sim_mat_test, sim_mat)) {
+      if (identical(sim_mat_test, sim_mat)) {
         
         print("This sim_mat will lead to an abortion.")
         
