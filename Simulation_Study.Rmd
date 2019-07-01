@@ -446,7 +446,9 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       sim_mat <- simulate_hare(...)
     }
     
-    tryLog({
+    
+    
+    tryCatchLog({
       
       # Cox Proportional Hazards model
       phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
@@ -457,6 +459,16 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       res[s_phm_sim_mat$coefficients[,5] <= .05, 1, i] <-
         phm_sim_mat$coefficients[s_phm_sim_mat$coefficients[,5] <= .05]
       
+    }, error = function(e) {save(sim_mat, file = paste0("error_sim_mats/", "PH", i,".RData"))
+      print(paste("error", i, "PH"))
+      }, 
+    warning = function(w) {save(sim_mat, file = paste0("warning_sim_mats/", "PH", i,".RData"))
+      print(paste("warning", i, "PH"))
+      })
+    
+    
+    
+    tryCatchLog({
       
       # Penalized Proportional Hazards model
       cv_phmnet <- cv.glmnet(as.matrix(sim_mat[-c(1,2)]),
@@ -467,7 +479,16 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       res[selected_coef != 0, 2, i] <- selected_coef[selected_coef != 0]
       
-      
+    }, error = function(e) {save(sim_mat, file = paste0("error_sim_mats/", "penalized_PH", i,".RData"))
+      print(paste("error", i, "penalized_PH"))
+      }, 
+    warning = function(w) {save(sim_mat, file = paste0("warning_sim_mats/", "penalized_PH", i,".RData"))
+      print(paste("warning", i, "penalized_PH"))
+      })
+    
+    
+    
+    tryCatchLog({
       
       # PH HARE model
       phm_hare <- hare(sim_mat$time, sim_mat$cid, 
@@ -480,7 +501,16 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       res[fcts_select[,1], 3, i] <- fcts_select[,5]
       
-      
+    }, error = function(e) {save(sim_mat, file = paste0("error_sim_mats/", "hare_PH", i,".RData"))
+      print(paste("error", i, "hare_PH"))
+      }, 
+    warning = function(w) {save(sim_mat, file = paste0("warning_sim_mats/", "hare_PH", i,".RData"))
+      print(paste("warning", i, "hare_PH"))
+      })
+    
+    
+    
+    tryCatchLog({
       
       # non-PH HARE model 
       nphm_hare <- hare(sim_mat$time, sim_mat$cid, as.matrix(sim_mat[-c(1,2)]))
@@ -498,7 +528,12 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       
       res[covxtime, 5, i] <- 1
       
-    })
+    }, error = function(e) {save(sim_mat, file = paste0("error_sim_mats/", "hare_non-PH", i,".RData"))
+      print(paste("error", i, "hare_non_PH"))
+      }, 
+    warning = function(w) {save(sim_mat, file = paste0("warning_sim_mats/", "hare_non-PH", i,".RData"))
+      print(paste("warning", i, "hare_non_PH"))
+      })
     
   }
   
@@ -599,13 +634,9 @@ toc()
 
 There are 584 instances of "Convergence problems...stopping addition."
 
-There are 4 instances out of 500 where no models picked up anything. I think this is due to too much censoring. 
-
-There's 1 instance out of 500 where only the Cox model picked up something, but none of the other models did. 
 
 
-
-Proportion of times each covariate is selected across the four models fitted on simulated 
+    Proportion of times each covariate is selected across the four models fitted on simulated 
     survival times from the Log-normal distribution (this will be Table 5b in the manuscript)
 ```{r}
 load("sims_hare500.RData")
