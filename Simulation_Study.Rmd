@@ -437,6 +437,28 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
   
   res <- array(NA, dim = c(p, 5, N))
   
+  
+  
+  tryCatchLog({
+      
+      # Cox Proportional Hazards model
+      phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
+      
+      s_phm_sim_mat <- summary(phm_sim_mat)
+      
+      # only storing the coefficient values for which the p-value is <= .05
+      res[s_phm_sim_mat$coefficients[,5] <= .05, 1, i] <-
+        phm_sim_mat$coefficients[s_phm_sim_mat$coefficients[,5] <= .05]
+      
+    }, error = function(e) {save(sim_mat, file = paste0("error_sim_mats/", "PH", i,".RData"))
+      print(paste("error", i, "PH"))
+      }, 
+    warning = function(w) {save(sim_mat, file = paste0("warning_sim_mats/", "PH", i,".RData"))
+      print(paste("warning", i, "PH"))
+      })
+  
+  
+  
   for (i in 1:N) {
     
     if (!hare_sim) {
@@ -523,24 +545,6 @@ simulate_regression <- function(N, p, hare_sim = FALSE, ...) {
       sim_mat <- sim_mat_test
       
     }
-    
-    tryCatchLog({
-      
-      # Cox Proportional Hazards model
-      phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat)
-      
-      s_phm_sim_mat <- summary(phm_sim_mat)
-      
-      # only storing the coefficient values for which the p-value is <= .05
-      res[s_phm_sim_mat$coefficients[,5] <= .05, 1, i] <-
-        phm_sim_mat$coefficients[s_phm_sim_mat$coefficients[,5] <= .05]
-      
-    }, error = function(e) {save(sim_mat, file = paste0("error_sim_mats/", "PH", i,".RData"))
-      print(paste("error", i, "PH"))
-      }, 
-    warning = function(w) {save(sim_mat, file = paste0("warning_sim_mats/", "PH", i,".RData"))
-      print(paste("warning", i, "PH"))
-      })
     
     
     
@@ -731,3 +735,32 @@ for (i in 1:16) {
 
 prop_hare
 ```
+
+
+
+Post-hoc correction: counting number of times a given covariate is selected by PH and penalized PH for the data sets that lead to R aborting when inputted into HARE PH or HARE non-PH
+
+This only corrects the PH estimates, and by a very small amount at that.
+
+<!-- ```{r} -->
+<!-- abort_files <- c("penalized_PH124.RData", "penalized_PH126.RData", "penalized_PH169.RData", "penalized_PH300.RData", "penalized_PH322.RData", "penalized_PH466.RData", "penalized_PH497.RData") -->
+
+<!-- mini_res <- array(NA, dim = c(16, 1, length(abort_files))) -->
+
+<!-- for (i in 1:length(abort_files)) { -->
+
+<!--   load(abort_files[i]) -->
+
+<!--   # Cox Proportional Hazards model -->
+<!--   phm_sim_mat <- coxph(Surv(time, cid) ~ ., data = sim_mat) -->
+
+<!--   print(summary(phm_sim_mat)) -->
+
+<!--   # # only storing the coefficient values for which the p-value is <= .05 -->
+<!--   # mini_res[s_phm_sim_mat$coefficients[,5] <= .05, 1, i] <- -->
+<!--   #   phm_sim_mat$coefficients[s_phm_sim_mat$coefficients[,5] <= .05] -->
+
+<!-- } -->
+
+<!-- ``` -->
+
